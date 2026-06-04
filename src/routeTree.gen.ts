@@ -13,6 +13,9 @@ import { Route as UserRouteImport } from './routes/user'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminTimesheetsRouteImport } from './routes/admin.timesheets'
+import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 
 const UserRoute = UserRouteImport.update({
   id: '/user',
@@ -34,37 +37,81 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTimesheetsRoute = AdminTimesheetsRouteImport.update({
+  id: '/timesheets',
+  path: '/timesheets',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProfileRoute = AdminProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/user': typeof UserRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/timesheets': typeof AdminTimesheetsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/user': typeof UserRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/timesheets': typeof AdminTimesheetsRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/user': typeof UserRoute
+  '/admin/profile': typeof AdminProfileRoute
+  '/admin/timesheets': typeof AdminTimesheetsRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/login' | '/user'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/login'
+    | '/user'
+    | '/admin/profile'
+    | '/admin/timesheets'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/login' | '/user'
-  id: '__root__' | '/' | '/admin' | '/login' | '/user'
+  to:
+    | '/'
+    | '/login'
+    | '/user'
+    | '/admin/profile'
+    | '/admin/timesheets'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/login'
+    | '/user'
+    | '/admin/profile'
+    | '/admin/timesheets'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
   UserRoute: typeof UserRoute
 }
@@ -99,12 +146,47 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/timesheets': {
+      id: '/admin/timesheets'
+      path: '/timesheets'
+      fullPath: '/admin/timesheets'
+      preLoaderRoute: typeof AdminTimesheetsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/profile': {
+      id: '/admin/profile'
+      path: '/profile'
+      fullPath: '/admin/profile'
+      preLoaderRoute: typeof AdminProfileRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminProfileRoute: typeof AdminProfileRoute
+  AdminTimesheetsRoute: typeof AdminTimesheetsRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminProfileRoute: AdminProfileRoute,
+  AdminTimesheetsRoute: AdminTimesheetsRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
   UserRoute: UserRoute,
 }
