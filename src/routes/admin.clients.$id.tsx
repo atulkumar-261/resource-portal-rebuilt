@@ -3,7 +3,7 @@ import { PageCard } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { useRMS } from "@/lib/store";
 
-export const Route = createFileRoute("/admin/clients/")({ component: ViewClient });
+export const Route = createFileRoute("/admin/clients/$id")({ component: ViewClient });
 
 function ViewClient() {
   const { id } = Route.useParams();
