@@ -15,10 +15,15 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminTimesheetsRouteImport } from './routes/admin.timesheets'
+import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
 import { Route as AdminResourcesRouteImport } from './routes/admin.resources'
 import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
+import { Route as AdminTasksNewRouteImport } from './routes/admin.tasks.new'
+import { Route as AdminTasksIdRouteImport } from './routes/admin.tasks.$id'
+import { Route as AdminResourcesPendingRouteImport } from './routes/admin.resources.pending'
+import { Route as AdminResourcesIdRouteImport } from './routes/admin.resources.$id'
 import { Route as AdminProjectsNewRouteImport } from './routes/admin.projects.new'
 import { Route as AdminClientsNewRouteImport } from './routes/admin.clients.new'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients.'
@@ -55,6 +60,11 @@ const AdminTimesheetsRoute = AdminTimesheetsRouteImport.update({
   path: '/timesheets',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTasksRoute = AdminTasksRouteImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminResourcesRoute = AdminResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
@@ -74,6 +84,26 @@ const AdminClientsRoute = AdminClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
   getParentRoute: () => AdminRoute,
+} as any)
+const AdminTasksNewRoute = AdminTasksNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AdminTasksRoute,
+} as any)
+const AdminTasksIdRoute = AdminTasksIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminTasksRoute,
+} as any)
+const AdminResourcesPendingRoute = AdminResourcesPendingRouteImport.update({
+  id: '/pending',
+  path: '/pending',
+  getParentRoute: () => AdminResourcesRoute,
+} as any)
+const AdminResourcesIdRoute = AdminResourcesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminResourcesRoute,
 } as any)
 const AdminProjectsNewRoute = AdminProjectsNewRouteImport.update({
   id: '/new',
@@ -109,12 +139,17 @@ export interface FileRoutesByFullPath {
   '/admin/clients': typeof AdminClientsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRoute
+  '/admin/resources': typeof AdminResourcesRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRouteWithChildren
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/clients/': typeof AdminClientsRoute
   '/admin/clients/new': typeof AdminClientsNewRoute
   '/admin/projects/new': typeof AdminProjectsNewRoute
+  '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/pending': typeof AdminResourcesPendingRoute
+  '/admin/tasks/$id': typeof AdminTasksIdRoute
+  '/admin/tasks/new': typeof AdminTasksNewRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
@@ -124,12 +159,17 @@ export interface FileRoutesByTo {
   '/user': typeof UserRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRoute
+  '/admin/resources': typeof AdminResourcesRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRouteWithChildren
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin': typeof AdminIndexRoute
   '/admin/clients': typeof AdminClientsRoute
   '/admin/clients/new': typeof AdminClientsNewRoute
   '/admin/projects/new': typeof AdminProjectsNewRoute
+  '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/pending': typeof AdminResourcesPendingRoute
+  '/admin/tasks/$id': typeof AdminTasksIdRoute
+  '/admin/tasks/new': typeof AdminTasksNewRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
@@ -142,12 +182,17 @@ export interface FileRoutesById {
   '/admin/clients': typeof AdminClientsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRoute
+  '/admin/resources': typeof AdminResourcesRouteWithChildren
+  '/admin/tasks': typeof AdminTasksRouteWithChildren
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/clients/': typeof AdminClientsRoute
   '/admin/clients/new': typeof AdminClientsNewRoute
   '/admin/projects/new': typeof AdminProjectsNewRoute
+  '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/pending': typeof AdminResourcesPendingRoute
+  '/admin/tasks/$id': typeof AdminTasksIdRoute
+  '/admin/tasks/new': typeof AdminTasksNewRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
@@ -162,11 +207,16 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/projects'
     | '/admin/resources'
+    | '/admin/tasks'
     | '/admin/timesheets'
     | '/admin/'
     | '/admin/clients/'
     | '/admin/clients/new'
     | '/admin/projects/new'
+    | '/admin/resources/$id'
+    | '/admin/resources/pending'
+    | '/admin/tasks/$id'
+    | '/admin/tasks/new'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -177,11 +227,16 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/projects'
     | '/admin/resources'
+    | '/admin/tasks'
     | '/admin/timesheets'
     | '/admin'
     | '/admin/clients'
     | '/admin/clients/new'
     | '/admin/projects/new'
+    | '/admin/resources/$id'
+    | '/admin/resources/pending'
+    | '/admin/tasks/$id'
+    | '/admin/tasks/new'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   id:
@@ -194,11 +249,16 @@ export interface FileRouteTypes {
     | '/admin/profile'
     | '/admin/projects'
     | '/admin/resources'
+    | '/admin/tasks'
     | '/admin/timesheets'
     | '/admin/'
     | '/admin/clients/'
     | '/admin/clients/new'
     | '/admin/projects/new'
+    | '/admin/resources/$id'
+    | '/admin/resources/pending'
+    | '/admin/tasks/$id'
+    | '/admin/tasks/new'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   fileRoutesById: FileRoutesById
@@ -254,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTimesheetsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/tasks': {
+      id: '/admin/tasks'
+      path: '/tasks'
+      fullPath: '/admin/tasks'
+      preLoaderRoute: typeof AdminTasksRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/resources': {
       id: '/admin/resources'
       path: '/resources'
@@ -281,6 +348,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/clients'
       preLoaderRoute: typeof AdminClientsRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/admin/tasks/new': {
+      id: '/admin/tasks/new'
+      path: '/new'
+      fullPath: '/admin/tasks/new'
+      preLoaderRoute: typeof AdminTasksNewRouteImport
+      parentRoute: typeof AdminTasksRoute
+    }
+    '/admin/tasks/$id': {
+      id: '/admin/tasks/$id'
+      path: '/$id'
+      fullPath: '/admin/tasks/$id'
+      preLoaderRoute: typeof AdminTasksIdRouteImport
+      parentRoute: typeof AdminTasksRoute
+    }
+    '/admin/resources/pending': {
+      id: '/admin/resources/pending'
+      path: '/pending'
+      fullPath: '/admin/resources/pending'
+      preLoaderRoute: typeof AdminResourcesPendingRouteImport
+      parentRoute: typeof AdminResourcesRoute
+    }
+    '/admin/resources/$id': {
+      id: '/admin/resources/$id'
+      path: '/$id'
+      fullPath: '/admin/resources/$id'
+      preLoaderRoute: typeof AdminResourcesIdRouteImport
+      parentRoute: typeof AdminResourcesRoute
     }
     '/admin/projects/new': {
       id: '/admin/projects/new'
@@ -350,11 +445,40 @@ const AdminProjectsRouteWithChildren = AdminProjectsRoute._addFileChildren(
   AdminProjectsRouteChildren,
 )
 
+interface AdminResourcesRouteChildren {
+  AdminResourcesIdRoute: typeof AdminResourcesIdRoute
+  AdminResourcesPendingRoute: typeof AdminResourcesPendingRoute
+}
+
+const AdminResourcesRouteChildren: AdminResourcesRouteChildren = {
+  AdminResourcesIdRoute: AdminResourcesIdRoute,
+  AdminResourcesPendingRoute: AdminResourcesPendingRoute,
+}
+
+const AdminResourcesRouteWithChildren = AdminResourcesRoute._addFileChildren(
+  AdminResourcesRouteChildren,
+)
+
+interface AdminTasksRouteChildren {
+  AdminTasksIdRoute: typeof AdminTasksIdRoute
+  AdminTasksNewRoute: typeof AdminTasksNewRoute
+}
+
+const AdminTasksRouteChildren: AdminTasksRouteChildren = {
+  AdminTasksIdRoute: AdminTasksIdRoute,
+  AdminTasksNewRoute: AdminTasksNewRoute,
+}
+
+const AdminTasksRouteWithChildren = AdminTasksRoute._addFileChildren(
+  AdminTasksRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminClientsRoute: typeof AdminClientsRouteWithChildren
   AdminProfileRoute: typeof AdminProfileRoute
   AdminProjectsRoute: typeof AdminProjectsRouteWithChildren
-  AdminResourcesRoute: typeof AdminResourcesRoute
+  AdminResourcesRoute: typeof AdminResourcesRouteWithChildren
+  AdminTasksRoute: typeof AdminTasksRouteWithChildren
   AdminTimesheetsRoute: typeof AdminTimesheetsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -363,7 +487,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClientsRoute: AdminClientsRouteWithChildren,
   AdminProfileRoute: AdminProfileRoute,
   AdminProjectsRoute: AdminProjectsRouteWithChildren,
-  AdminResourcesRoute: AdminResourcesRoute,
+  AdminResourcesRoute: AdminResourcesRouteWithChildren,
+  AdminTasksRoute: AdminTasksRouteWithChildren,
   AdminTimesheetsRoute: AdminTimesheetsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
