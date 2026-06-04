@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminTimesheetsRouteImport } from './routes/admin.timesheets'
+import { Route as AdminResourcesRouteImport } from './routes/admin.resources'
 import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
 import { Route as AdminClientsRouteImport } from './routes/admin.clients'
@@ -52,6 +53,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminTimesheetsRoute = AdminTimesheetsRouteImport.update({
   id: '/timesheets',
   path: '/timesheets',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminResourcesRoute = AdminResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminProjectsRoute = AdminProjectsRouteImport.update({
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/admin/clients': typeof AdminClientsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
+  '/admin/resources': typeof AdminResourcesRoute
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/clients/': typeof AdminClientsRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/user': typeof UserRoute
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
+  '/admin/resources': typeof AdminResourcesRoute
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin': typeof AdminIndexRoute
   '/admin/clients': typeof AdminClientsRoute
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/admin/clients': typeof AdminClientsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
   '/admin/projects': typeof AdminProjectsRouteWithChildren
+  '/admin/resources': typeof AdminResourcesRoute
   '/admin/timesheets': typeof AdminTimesheetsRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/clients/': typeof AdminClientsRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/profile'
     | '/admin/projects'
+    | '/admin/resources'
     | '/admin/timesheets'
     | '/admin/'
     | '/admin/clients/'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/user'
     | '/admin/profile'
     | '/admin/projects'
+    | '/admin/resources'
     | '/admin/timesheets'
     | '/admin'
     | '/admin/clients'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/admin/clients'
     | '/admin/profile'
     | '/admin/projects'
+    | '/admin/resources'
     | '/admin/timesheets'
     | '/admin/'
     | '/admin/clients/'
@@ -240,6 +252,13 @@ declare module '@tanstack/react-router' {
       path: '/timesheets'
       fullPath: '/admin/timesheets'
       preLoaderRoute: typeof AdminTimesheetsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/resources': {
+      id: '/admin/resources'
+      path: '/resources'
+      fullPath: '/admin/resources'
+      preLoaderRoute: typeof AdminResourcesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/projects': {
@@ -335,6 +354,7 @@ interface AdminRouteChildren {
   AdminClientsRoute: typeof AdminClientsRouteWithChildren
   AdminProfileRoute: typeof AdminProfileRoute
   AdminProjectsRoute: typeof AdminProjectsRouteWithChildren
+  AdminResourcesRoute: typeof AdminResourcesRoute
   AdminTimesheetsRoute: typeof AdminTimesheetsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -343,6 +363,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminClientsRoute: AdminClientsRouteWithChildren,
   AdminProfileRoute: AdminProfileRoute,
   AdminProjectsRoute: AdminProjectsRouteWithChildren,
+  AdminResourcesRoute: AdminResourcesRoute,
   AdminTimesheetsRoute: AdminTimesheetsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
