@@ -6,7 +6,12 @@ import { Label } from "@/components/ui/label";
 import { useAuth, useRMS } from "@/lib/store";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Login — Magnific IT" }, { name: "description", content: "Sign in to Magnific IT Resource Management." }] }),
+  head: () => ({
+    meta: [
+      { title: "Login — Magnific IT" },
+      { name: "description", content: "Sign in to Magnific IT Resource Management." },
+    ],
+  }),
   component: LoginPage,
 });
 
@@ -35,13 +40,16 @@ function LoginPage() {
       <div className="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden grid md:grid-cols-2 border border-slate-200">
         <div className="hidden md:flex flex-col justify-between p-10 bg-gradient-to-br from-blue-700 to-indigo-800 text-white">
           <div>
-            <div className="w-14 h-14 rounded-md bg-white/15 flex items-center justify-center font-bold text-2xl mb-6">M</div>
+            <div className="w-14 h-14 rounded-md bg-white/15 flex items-center justify-center font-bold text-2xl mb-6">
+              M
+            </div>
             <h1 className="text-3xl font-bold leading-tight">Magnific IT</h1>
             <p className="text-blue-100 mt-1">Resource Management System</p>
           </div>
           <div>
             <p className="text-sm text-blue-100 leading-relaxed">
-              Manage resources, projects, timesheets, leaves, payslips and announcements — all in one place.
+              Manage resources, projects, timesheets, leaves, payslips and announcements — all in
+              one place.
             </p>
             <p className="text-xs text-blue-200/80 mt-6">© 2026 All rights reserved MAGNIFIC IT</p>
           </div>
@@ -56,21 +64,36 @@ function LoginPage() {
             </div>
             <div>
               <Label>Password</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
             </div>
             <div>
               <Label>Role</Label>
               <div className="flex gap-4 mt-1.5">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" checked={role === "admin"} onChange={() => setRole("admin")} /> Admin
+                  <input
+                    type="radio"
+                    checked={role === "admin"}
+                    onChange={() => setRole("admin")}
+                  />{" "}
+                  Admin
                 </label>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" checked={role === "user"} onChange={() => setRole("user")} /> Resource
+                  <input type="radio" checked={role === "user"} onChange={() => setRole("user")} />{" "}
+                  Resource
                 </label>
               </div>
             </div>
-            <Button type="submit" className="w-full">Login</Button>
-            <p className="text-xs text-slate-500 text-center">Demo: pick Admin or Resource and sign in.</p>
+            <Button type="submit" className="w-full">
+              Login
+            </Button>
+            <p className="text-xs text-slate-500 text-center">
+              Demo: pick Admin or Resource and sign in.
+            </p>
           </form>
         </div>
       </div>

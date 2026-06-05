@@ -9,6 +9,11 @@ lerna-debug.log*
 
 node_modules
 dist
+
+# Python
+venv/
+__pycache__/
+*.pyc
 dist-ssr
 .output
 .vinxi
@@ -30,3 +35,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Agent workspace
+.agents/
+graphify-out/
+
+# Environment files
+.env
+.env.*

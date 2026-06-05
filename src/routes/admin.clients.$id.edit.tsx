@@ -10,5 +10,14 @@ function EditClient() {
   const updateClient = useRMS((s) => s.updateClient);
   const router = useRouter();
   if (!client) return <p>Not found.</p>;
-  return <ClientForm title="Edit Client" defaults={client} onSubmit={(v) => { updateClient(id, v); router.navigate({ to: "/admin/clients" }); }} />;
+  return (
+    <ClientForm
+      title="Edit Client"
+      defaults={client}
+      onSubmit={(v) => {
+        updateClient(id, v);
+        router.navigate({ to: "/admin/clients" });
+      }}
+    />
+  );
 }

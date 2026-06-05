@@ -8,7 +8,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Payslip } from "@/lib/types";
 import { Plus, Trash2 } from "lucide-react";
 
-export const Route = createFileRoute("/admin/payslips")({ component: PayslipsPage });
+export const Route = createFileRoute('/admin/payslips/')({ component: PayslipsPage });
 
 function PayslipsPage() {
   const payslips = useRMS((s) => s.payslips);
@@ -17,14 +17,38 @@ function PayslipsPage() {
     { header: "User", accessorKey: "resourceName" },
     { header: "Payslip Month", accessorKey: "month" },
     { header: "Number of Days", accessorKey: "days" },
-    { header: "Amount", accessorKey: "amount", cell: ({ getValue }) => `£${Number(getValue()).toLocaleString()}` },
+    {
+      header: "Amount",
+      accessorKey: "amount",
+      cell: ({ getValue }) => `£${Number(getValue()).toLocaleString()}`,
+    },
     { header: "Notes", accessorKey: "notes" },
-    { header: "Actions", id: "a", cell: ({ row }) => (
-      <ConfirmDialog trigger={<Button size="sm" variant="ghost" className="text-rose-600"><Trash2 className="w-4 h-4" /></Button>} onConfirm={() => del(row.original.id)} />
-    )},
+    {
+      header: "Actions",
+      id: "a",
+      cell: ({ row }) => (
+        <ConfirmDialog
+          trigger={
+            <Button size="sm" variant="ghost" className="text-rose-600">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          }
+          onConfirm={() => del(row.original.id)}
+        />
+      ),
+    },
   ];
   return (
-    <PageCard title="Pay Slips List" actions={<Link to="/admin/payslips/new"><Button size="sm"><Plus className="w-4 h-4" /> Create Payslip</Button></Link>}>
+    <PageCard
+      title="Pay Slips List"
+      actions={
+        <Button size="sm" asChild>
+          <Link to="/admin/payslips/new">
+            <Plus className="w-4 h-4" /> Create Payslip
+          </Link>
+        </Button>
+      }
+    >
       <DataTable data={payslips} columns={columns} />
     </PageCard>
   );

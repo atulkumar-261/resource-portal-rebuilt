@@ -1,26 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useRMS } from "@/lib/store";
+import { Plus, Trash2, Search, User } from "lucide-react";
 import { useState } from "react";
-import { Search, User } from "lucide-react";
 
-export const Route = createFileRoute("/admin/clients/$id")({ component: ViewClient });
+export const Route = createFileRoute("/admin/announcements/")({
+  component: AdminannouncementsPage,
+});
 
-function ViewClient() {
-  const { id } = Route.useParams();
-  const client = useRMS((s) => s.clients.find((c) => c.id === id));
+function AdminannouncementsPage() {
+  const list = useRMS((s) => s.announcements);
+  const del = useRMS((s) => s.deleteAnnouncement);
   const resources = useRMS((s) => s.resources);
 
   // Sidebar search state
   const [searchQuery, setSearchQuery] = useState("");
-
-  if (!client)
-    return (
-      <PageCard title="Client">
-        <p>Not found.</p>
-      </PageCard>
-    );
 
   // Sidebar active resources filter
   const activeResources = resources.filter((r) => r.status === "active");
@@ -32,40 +28,56 @@ function ViewClient() {
 
   return (
     <div className="grid lg:grid-cols-12 gap-8">
-      {/* Left Column: Client Details */}
+      {/* Left Column: Announcements Table */}
       <div className="lg:col-span-8">
         <PageCard
-          title={`Client — ${client.name}`}
+          title="Announcements"
           actions={
             <Button size="sm" asChild>
-              <Link to="/admin/clients/$id/edit" params={{ id }}>
-                Edit
+              <Link to="/admin/announcements/new">
+                <Plus className="w-4 h-4" /> New
               </Link>
             </Button>
           }
         >
-          <dl className="grid md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <dt className="text-slate-500">Name</dt>
-              <dd className="font-medium">{client.name}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Contact Person</dt>
-              <dd className="font-medium">{client.contactPerson}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Email</dt>
-              <dd className="font-medium">{client.email}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Phone</dt>
-              <dd className="font-medium">{client.phone}</dd>
-            </div>
-            <div className="md:col-span-2">
-              <dt className="text-slate-500">Address</dt>
-              <dd className="font-medium">{client.address}</dd>
-            </div>
-          </dl>
+          <div className="overflow-x-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-sm border-collapse text-left">
+              <thead>
+                <tr className="bg-slate-100 text-slate-700 font-medium">
+                  <th className="px-4 py-2 border-b border-slate-200">Subject</th>
+                  <th className="px-4 py-2 border-b border-slate-200">Message</th>
+                  <th className="px-4 py-2 border-b border-slate-200">Date</th>
+                  <th className="px-4 py-2 border-b border-slate-200 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {list.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-center text-slate-500 py-6 font-medium">
+                      No announcement found
+                    </td>
+                  </tr>
+                )}
+                {list.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 font-medium text-slate-800">{a.subject}</td>
+                    <td className="px-4 py-3 text-slate-600">{a.message}</td>
+                    <td className="px-4 py-3 text-slate-500">{a.date}</td>
+                    <td className="px-4 py-3 text-right">
+                      <ConfirmDialog
+                        trigger={
+                          <Button size="sm" variant="ghost" className="text-rose-600">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        }
+                        onConfirm={() => del(a.id)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </PageCard>
       </div>
 

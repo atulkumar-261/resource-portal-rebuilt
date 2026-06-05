@@ -7,5 +7,13 @@ export const Route = createFileRoute("/admin/clients/new")({ component: NewClien
 function NewClient() {
   const addClient = useRMS((s) => s.addClient);
   const router = useRouter();
-  return <ClientForm title="Create Client" onSubmit={(v) => { addClient({ ...v, id: "" }); router.navigate({ to: "/admin/clients" }); }} />;
+  return (
+    <ClientForm
+      title="Create Client"
+      onSubmit={(v) => {
+        addClient({ ...v, id: "" });
+        router.navigate({ to: "/admin/clients" });
+      }}
+    />
+  );
 }

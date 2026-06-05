@@ -15,25 +15,28 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UserIndexRouteImport } from './routes/user.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as UserTimesheetsRouteImport } from './routes/user.timesheets'
-import { Route as UserTasksRouteImport } from './routes/user.tasks'
 import { Route as UserProfileRouteImport } from './routes/user.profile'
 import { Route as UserPayslipsRouteImport } from './routes/user.payslips'
-import { Route as UserLeavesRouteImport } from './routes/user.leaves'
 import { Route as UserAnnouncementsRouteImport } from './routes/user.announcements'
 import { Route as AdminTimesheetsRouteImport } from './routes/admin.timesheets'
-import { Route as AdminTasksRouteImport } from './routes/admin.tasks'
-import { Route as AdminResourcesRouteImport } from './routes/admin.resources'
-import { Route as AdminReportsRouteImport } from './routes/admin.reports'
-import { Route as AdminProjectsRouteImport } from './routes/admin.projects'
 import { Route as AdminProfileRouteImport } from './routes/admin.profile'
-import { Route as AdminPayslipsRouteImport } from './routes/admin.payslips'
 import { Route as AdminLeavesRouteImport } from './routes/admin.leaves'
-import { Route as AdminClientsRouteImport } from './routes/admin.clients'
-import { Route as AdminAnnouncementsRouteImport } from './routes/admin.announcements'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
+import { Route as UserTimesheetsIndexRouteImport } from './routes/user.timesheets.index'
+import { Route as UserTasksIndexRouteImport } from './routes/user.tasks.index'
+import { Route as UserLeavesIndexRouteImport } from './routes/user.leaves.index'
+import { Route as AdminTimesheetsIndexRouteImport } from './routes/admin.timesheets.index'
+import { Route as AdminTasksIndexRouteImport } from './routes/admin.tasks.index'
+import { Route as AdminResourcesIndexRouteImport } from './routes/admin.resources.index'
+import { Route as AdminReportsIndexRouteImport } from './routes/admin.reports.index'
+import { Route as AdminProjectsIndexRouteImport } from './routes/admin.projects.index'
+import { Route as AdminPayslipsIndexRouteImport } from './routes/admin.payslips.index'
+import { Route as AdminClientsIndexRouteImport } from './routes/admin.clients.index'
+import { Route as AdminAnnouncementsIndexRouteImport } from './routes/admin.announcements.index'
 import { Route as UserTimesheetsNewRouteImport } from './routes/user.timesheets.new'
 import { Route as UserTasksIdRouteImport } from './routes/user.tasks.$id'
 import { Route as UserLeavesApplyRouteImport } from './routes/user.leaves.apply'
+import { Route as AdminTimesheetsIdRouteImport } from './routes/admin.timesheets.$id'
 import { Route as AdminTasksNewRouteImport } from './routes/admin.tasks.new'
 import { Route as AdminTasksIdRouteImport } from './routes/admin.tasks.$id'
 import { Route as AdminResourcesPendingRouteImport } from './routes/admin.resources.pending'
@@ -79,16 +82,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const UserTimesheetsRoute = UserTimesheetsRouteImport.update({
-  id: '/timesheets',
-  path: '/timesheets',
-  getParentRoute: () => UserRoute,
-} as any)
-const UserTasksRoute = UserTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => UserRoute,
-} as any)
 const UserProfileRoute = UserProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -97,11 +90,6 @@ const UserProfileRoute = UserProfileRouteImport.update({
 const UserPayslipsRoute = UserPayslipsRouteImport.update({
   id: '/payslips',
   path: '/payslips',
-  getParentRoute: () => UserRoute,
-} as any)
-const UserLeavesRoute = UserLeavesRouteImport.update({
-  id: '/leaves',
-  path: '/leaves',
   getParentRoute: () => UserRoute,
 } as any)
 const UserAnnouncementsRoute = UserAnnouncementsRouteImport.update({
@@ -114,34 +102,9 @@ const AdminTimesheetsRoute = AdminTimesheetsRouteImport.update({
   path: '/timesheets',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminTasksRoute = AdminTasksRouteImport.update({
-  id: '/tasks',
-  path: '/tasks',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminResourcesRoute = AdminResourcesRouteImport.update({
-  id: '/resources',
-  path: '/resources',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminProjectsRoute = AdminProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminProfileRoute = AdminProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminPayslipsRoute = AdminPayslipsRouteImport.update({
-  id: '/payslips',
-  path: '/payslips',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLeavesRoute = AdminLeavesRouteImport.update({
@@ -149,97 +112,152 @@ const AdminLeavesRoute = AdminLeavesRouteImport.update({
   path: '/leaves',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminClientsRoute = AdminClientsRouteImport.update({
-  id: '/clients',
-  path: '/clients',
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminAnnouncementsRoute = AdminAnnouncementsRouteImport.update({
-  id: '/announcements',
-  path: '/announcements',
+const UserTimesheetsIndexRoute = UserTimesheetsIndexRouteImport.update({
+  id: '/timesheets/',
+  path: '/timesheets/',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserTasksIndexRoute = UserTasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
+  getParentRoute: () => UserRoute,
+} as any)
+const UserLeavesIndexRoute = UserLeavesIndexRouteImport.update({
+  id: '/leaves/',
+  path: '/leaves/',
+  getParentRoute: () => UserRoute,
+} as any)
+const AdminTimesheetsIndexRoute = AdminTimesheetsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminTimesheetsRoute,
+} as any)
+const AdminTasksIndexRoute = AdminTasksIndexRouteImport.update({
+  id: '/tasks/',
+  path: '/tasks/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminResourcesIndexRoute = AdminResourcesIndexRouteImport.update({
+  id: '/resources/',
+  path: '/resources/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsIndexRoute = AdminReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminProjectsIndexRoute = AdminProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPayslipsIndexRoute = AdminPayslipsIndexRouteImport.update({
+  id: '/payslips/',
+  path: '/payslips/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminClientsIndexRoute = AdminClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnnouncementsIndexRoute = AdminAnnouncementsIndexRouteImport.update({
+  id: '/announcements/',
+  path: '/announcements/',
   getParentRoute: () => AdminRoute,
 } as any)
 const UserTimesheetsNewRoute = UserTimesheetsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => UserTimesheetsRoute,
+  id: '/timesheets/new',
+  path: '/timesheets/new',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserTasksIdRoute = UserTasksIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => UserTasksRoute,
+  id: '/tasks/$id',
+  path: '/tasks/$id',
+  getParentRoute: () => UserRoute,
 } as any)
 const UserLeavesApplyRoute = UserLeavesApplyRouteImport.update({
-  id: '/apply',
-  path: '/apply',
-  getParentRoute: () => UserLeavesRoute,
+  id: '/leaves/apply',
+  path: '/leaves/apply',
+  getParentRoute: () => UserRoute,
+} as any)
+const AdminTimesheetsIdRoute = AdminTimesheetsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminTimesheetsRoute,
 } as any)
 const AdminTasksNewRoute = AdminTasksNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AdminTasksRoute,
+  id: '/tasks/new',
+  path: '/tasks/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminTasksIdRoute = AdminTasksIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminTasksRoute,
+  id: '/tasks/$id',
+  path: '/tasks/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminResourcesPendingRoute = AdminResourcesPendingRouteImport.update({
-  id: '/pending',
-  path: '/pending',
-  getParentRoute: () => AdminResourcesRoute,
+  id: '/resources/pending',
+  path: '/resources/pending',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminResourcesIdRoute = AdminResourcesIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminResourcesRoute,
+  id: '/resources/$id',
+  path: '/resources/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminReportsVisaExpiryRoute = AdminReportsVisaExpiryRouteImport.update({
-  id: '/visa-expiry',
-  path: '/visa-expiry',
-  getParentRoute: () => AdminReportsRoute,
+  id: '/reports/visa-expiry',
+  path: '/reports/visa-expiry',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminReportsPassportExpiryRoute =
   AdminReportsPassportExpiryRouteImport.update({
-    id: '/passport-expiry',
-    path: '/passport-expiry',
-    getParentRoute: () => AdminReportsRoute,
+    id: '/reports/passport-expiry',
+    path: '/reports/passport-expiry',
+    getParentRoute: () => AdminRoute,
   } as any)
 const AdminReportsAddressChangeRoute =
   AdminReportsAddressChangeRouteImport.update({
-    id: '/address-change',
-    path: '/address-change',
-    getParentRoute: () => AdminReportsRoute,
+    id: '/reports/address-change',
+    path: '/reports/address-change',
+    getParentRoute: () => AdminRoute,
   } as any)
 const AdminProjectsNewRoute = AdminProjectsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AdminProjectsRoute,
+  id: '/projects/new',
+  path: '/projects/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminPayslipsNewRoute = AdminPayslipsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AdminPayslipsRoute,
+  id: '/payslips/new',
+  path: '/payslips/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminClientsNewRoute = AdminClientsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AdminClientsRoute,
+  id: '/clients/new',
+  path: '/clients/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminClientsIdRoute = AdminClientsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminClientsRoute,
+  id: '/clients/$id',
+  path: '/clients/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminAnnouncementsNewRoute = AdminAnnouncementsNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => AdminAnnouncementsRoute,
+  id: '/announcements/new',
+  path: '/announcements/new',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminProjectsIdEditRoute = AdminProjectsIdEditRouteImport.update({
-  id: '/$id/edit',
-  path: '/$id/edit',
-  getParentRoute: () => AdminProjectsRoute,
+  id: '/projects/$id/edit',
+  path: '/projects/$id/edit',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminClientsIdEditRoute = AdminClientsIdEditRouteImport.update({
   id: '/edit',
@@ -252,22 +270,13 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/user': typeof UserRouteWithChildren
-  '/admin/announcements': typeof AdminAnnouncementsRouteWithChildren
-  '/admin/clients': typeof AdminClientsRouteWithChildren
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/leaves': typeof AdminLeavesRoute
-  '/admin/payslips': typeof AdminPayslipsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/reports': typeof AdminReportsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRouteWithChildren
-  '/admin/tasks': typeof AdminTasksRouteWithChildren
-  '/admin/timesheets': typeof AdminTimesheetsRoute
+  '/admin/timesheets': typeof AdminTimesheetsRouteWithChildren
   '/user/announcements': typeof UserAnnouncementsRoute
-  '/user/leaves': typeof UserLeavesRouteWithChildren
   '/user/payslips': typeof UserPayslipsRoute
   '/user/profile': typeof UserProfileRoute
-  '/user/tasks': typeof UserTasksRouteWithChildren
-  '/user/timesheets': typeof UserTimesheetsRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/announcements/new': typeof AdminAnnouncementsNewRoute
@@ -282,31 +291,33 @@ export interface FileRoutesByFullPath {
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
   '/admin/tasks/new': typeof AdminTasksNewRoute
+  '/admin/timesheets/$id': typeof AdminTimesheetsIdRoute
   '/user/leaves/apply': typeof UserLeavesApplyRoute
   '/user/tasks/$id': typeof UserTasksIdRoute
   '/user/timesheets/new': typeof UserTimesheetsNewRoute
+  '/admin/announcements/': typeof AdminAnnouncementsIndexRoute
+  '/admin/clients/': typeof AdminClientsIndexRoute
+  '/admin/payslips/': typeof AdminPayslipsIndexRoute
+  '/admin/projects/': typeof AdminProjectsIndexRoute
+  '/admin/reports/': typeof AdminReportsIndexRoute
+  '/admin/resources/': typeof AdminResourcesIndexRoute
+  '/admin/tasks/': typeof AdminTasksIndexRoute
+  '/admin/timesheets/': typeof AdminTimesheetsIndexRoute
+  '/user/leaves/': typeof UserLeavesIndexRoute
+  '/user/tasks/': typeof UserTasksIndexRoute
+  '/user/timesheets/': typeof UserTimesheetsIndexRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/admin/announcements': typeof AdminAnnouncementsRouteWithChildren
-  '/admin/clients': typeof AdminClientsRouteWithChildren
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/leaves': typeof AdminLeavesRoute
-  '/admin/payslips': typeof AdminPayslipsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/reports': typeof AdminReportsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRouteWithChildren
-  '/admin/tasks': typeof AdminTasksRouteWithChildren
-  '/admin/timesheets': typeof AdminTimesheetsRoute
   '/user/announcements': typeof UserAnnouncementsRoute
-  '/user/leaves': typeof UserLeavesRouteWithChildren
   '/user/payslips': typeof UserPayslipsRoute
   '/user/profile': typeof UserProfileRoute
-  '/user/tasks': typeof UserTasksRouteWithChildren
-  '/user/timesheets': typeof UserTimesheetsRouteWithChildren
   '/admin': typeof AdminIndexRoute
   '/user': typeof UserIndexRoute
   '/admin/announcements/new': typeof AdminAnnouncementsNewRoute
@@ -321,9 +332,21 @@ export interface FileRoutesByTo {
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
   '/admin/tasks/new': typeof AdminTasksNewRoute
+  '/admin/timesheets/$id': typeof AdminTimesheetsIdRoute
   '/user/leaves/apply': typeof UserLeavesApplyRoute
   '/user/tasks/$id': typeof UserTasksIdRoute
   '/user/timesheets/new': typeof UserTimesheetsNewRoute
+  '/admin/announcements': typeof AdminAnnouncementsIndexRoute
+  '/admin/clients': typeof AdminClientsIndexRoute
+  '/admin/payslips': typeof AdminPayslipsIndexRoute
+  '/admin/projects': typeof AdminProjectsIndexRoute
+  '/admin/reports': typeof AdminReportsIndexRoute
+  '/admin/resources': typeof AdminResourcesIndexRoute
+  '/admin/tasks': typeof AdminTasksIndexRoute
+  '/admin/timesheets': typeof AdminTimesheetsIndexRoute
+  '/user/leaves': typeof UserLeavesIndexRoute
+  '/user/tasks': typeof UserTasksIndexRoute
+  '/user/timesheets': typeof UserTimesheetsIndexRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
@@ -333,22 +356,13 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/user': typeof UserRouteWithChildren
-  '/admin/announcements': typeof AdminAnnouncementsRouteWithChildren
-  '/admin/clients': typeof AdminClientsRouteWithChildren
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/leaves': typeof AdminLeavesRoute
-  '/admin/payslips': typeof AdminPayslipsRouteWithChildren
   '/admin/profile': typeof AdminProfileRoute
-  '/admin/projects': typeof AdminProjectsRouteWithChildren
-  '/admin/reports': typeof AdminReportsRouteWithChildren
-  '/admin/resources': typeof AdminResourcesRouteWithChildren
-  '/admin/tasks': typeof AdminTasksRouteWithChildren
-  '/admin/timesheets': typeof AdminTimesheetsRoute
+  '/admin/timesheets': typeof AdminTimesheetsRouteWithChildren
   '/user/announcements': typeof UserAnnouncementsRoute
-  '/user/leaves': typeof UserLeavesRouteWithChildren
   '/user/payslips': typeof UserPayslipsRoute
   '/user/profile': typeof UserProfileRoute
-  '/user/tasks': typeof UserTasksRouteWithChildren
-  '/user/timesheets': typeof UserTimesheetsRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/user/': typeof UserIndexRoute
   '/admin/announcements/new': typeof AdminAnnouncementsNewRoute
@@ -363,9 +377,21 @@ export interface FileRoutesById {
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
   '/admin/tasks/new': typeof AdminTasksNewRoute
+  '/admin/timesheets/$id': typeof AdminTimesheetsIdRoute
   '/user/leaves/apply': typeof UserLeavesApplyRoute
   '/user/tasks/$id': typeof UserTasksIdRoute
   '/user/timesheets/new': typeof UserTimesheetsNewRoute
+  '/admin/announcements/': typeof AdminAnnouncementsIndexRoute
+  '/admin/clients/': typeof AdminClientsIndexRoute
+  '/admin/payslips/': typeof AdminPayslipsIndexRoute
+  '/admin/projects/': typeof AdminProjectsIndexRoute
+  '/admin/reports/': typeof AdminReportsIndexRoute
+  '/admin/resources/': typeof AdminResourcesIndexRoute
+  '/admin/tasks/': typeof AdminTasksIndexRoute
+  '/admin/timesheets/': typeof AdminTimesheetsIndexRoute
+  '/user/leaves/': typeof UserLeavesIndexRoute
+  '/user/tasks/': typeof UserTasksIndexRoute
+  '/user/timesheets/': typeof UserTimesheetsIndexRoute
   '/admin/clients/$id/edit': typeof AdminClientsIdEditRoute
   '/admin/projects/$id/edit': typeof AdminProjectsIdEditRoute
 }
@@ -376,22 +402,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/user'
-    | '/admin/announcements'
-    | '/admin/clients'
+    | '/admin/analytics'
     | '/admin/leaves'
-    | '/admin/payslips'
     | '/admin/profile'
-    | '/admin/projects'
-    | '/admin/reports'
-    | '/admin/resources'
-    | '/admin/tasks'
     | '/admin/timesheets'
     | '/user/announcements'
-    | '/user/leaves'
     | '/user/payslips'
     | '/user/profile'
-    | '/user/tasks'
-    | '/user/timesheets'
     | '/admin/'
     | '/user/'
     | '/admin/announcements/new'
@@ -406,31 +423,33 @@ export interface FileRouteTypes {
     | '/admin/resources/pending'
     | '/admin/tasks/$id'
     | '/admin/tasks/new'
+    | '/admin/timesheets/$id'
     | '/user/leaves/apply'
     | '/user/tasks/$id'
     | '/user/timesheets/new'
+    | '/admin/announcements/'
+    | '/admin/clients/'
+    | '/admin/payslips/'
+    | '/admin/projects/'
+    | '/admin/reports/'
+    | '/admin/resources/'
+    | '/admin/tasks/'
+    | '/admin/timesheets/'
+    | '/user/leaves/'
+    | '/user/tasks/'
+    | '/user/timesheets/'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
-    | '/admin/announcements'
-    | '/admin/clients'
+    | '/admin/analytics'
     | '/admin/leaves'
-    | '/admin/payslips'
     | '/admin/profile'
-    | '/admin/projects'
-    | '/admin/reports'
-    | '/admin/resources'
-    | '/admin/tasks'
-    | '/admin/timesheets'
     | '/user/announcements'
-    | '/user/leaves'
     | '/user/payslips'
     | '/user/profile'
-    | '/user/tasks'
-    | '/user/timesheets'
     | '/admin'
     | '/user'
     | '/admin/announcements/new'
@@ -445,9 +464,21 @@ export interface FileRouteTypes {
     | '/admin/resources/pending'
     | '/admin/tasks/$id'
     | '/admin/tasks/new'
+    | '/admin/timesheets/$id'
     | '/user/leaves/apply'
     | '/user/tasks/$id'
     | '/user/timesheets/new'
+    | '/admin/announcements'
+    | '/admin/clients'
+    | '/admin/payslips'
+    | '/admin/projects'
+    | '/admin/reports'
+    | '/admin/resources'
+    | '/admin/tasks'
+    | '/admin/timesheets'
+    | '/user/leaves'
+    | '/user/tasks'
+    | '/user/timesheets'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   id:
@@ -456,22 +487,13 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/user'
-    | '/admin/announcements'
-    | '/admin/clients'
+    | '/admin/analytics'
     | '/admin/leaves'
-    | '/admin/payslips'
     | '/admin/profile'
-    | '/admin/projects'
-    | '/admin/reports'
-    | '/admin/resources'
-    | '/admin/tasks'
     | '/admin/timesheets'
     | '/user/announcements'
-    | '/user/leaves'
     | '/user/payslips'
     | '/user/profile'
-    | '/user/tasks'
-    | '/user/timesheets'
     | '/admin/'
     | '/user/'
     | '/admin/announcements/new'
@@ -486,9 +508,21 @@ export interface FileRouteTypes {
     | '/admin/resources/pending'
     | '/admin/tasks/$id'
     | '/admin/tasks/new'
+    | '/admin/timesheets/$id'
     | '/user/leaves/apply'
     | '/user/tasks/$id'
     | '/user/timesheets/new'
+    | '/admin/announcements/'
+    | '/admin/clients/'
+    | '/admin/payslips/'
+    | '/admin/projects/'
+    | '/admin/reports/'
+    | '/admin/resources/'
+    | '/admin/tasks/'
+    | '/admin/timesheets/'
+    | '/user/leaves/'
+    | '/user/tasks/'
+    | '/user/timesheets/'
     | '/admin/clients/$id/edit'
     | '/admin/projects/$id/edit'
   fileRoutesById: FileRoutesById
@@ -544,20 +578,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/user/timesheets': {
-      id: '/user/timesheets'
-      path: '/timesheets'
-      fullPath: '/user/timesheets'
-      preLoaderRoute: typeof UserTimesheetsRouteImport
-      parentRoute: typeof UserRoute
-    }
-    '/user/tasks': {
-      id: '/user/tasks'
-      path: '/tasks'
-      fullPath: '/user/tasks'
-      preLoaderRoute: typeof UserTasksRouteImport
-      parentRoute: typeof UserRoute
-    }
     '/user/profile': {
       id: '/user/profile'
       path: '/profile'
@@ -570,13 +590,6 @@ declare module '@tanstack/react-router' {
       path: '/payslips'
       fullPath: '/user/payslips'
       preLoaderRoute: typeof UserPayslipsRouteImport
-      parentRoute: typeof UserRoute
-    }
-    '/user/leaves': {
-      id: '/user/leaves'
-      path: '/leaves'
-      fullPath: '/user/leaves'
-      preLoaderRoute: typeof UserLeavesRouteImport
       parentRoute: typeof UserRoute
     }
     '/user/announcements': {
@@ -593,46 +606,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTimesheetsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/tasks': {
-      id: '/admin/tasks'
-      path: '/tasks'
-      fullPath: '/admin/tasks'
-      preLoaderRoute: typeof AdminTasksRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/resources': {
-      id: '/admin/resources'
-      path: '/resources'
-      fullPath: '/admin/resources'
-      preLoaderRoute: typeof AdminResourcesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reports': {
-      id: '/admin/reports'
-      path: '/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/projects': {
-      id: '/admin/projects'
-      path: '/projects'
-      fullPath: '/admin/projects'
-      preLoaderRoute: typeof AdminProjectsRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/profile': {
       id: '/admin/profile'
       path: '/profile'
       fullPath: '/admin/profile'
       preLoaderRoute: typeof AdminProfileRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/payslips': {
-      id: '/admin/payslips'
-      path: '/payslips'
-      fullPath: '/admin/payslips'
-      preLoaderRoute: typeof AdminPayslipsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/leaves': {
@@ -642,131 +620,208 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLeavesRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/clients': {
-      id: '/admin/clients'
-      path: '/clients'
-      fullPath: '/admin/clients'
-      preLoaderRoute: typeof AdminClientsRouteImport
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/announcements': {
-      id: '/admin/announcements'
+    '/user/timesheets/': {
+      id: '/user/timesheets/'
+      path: '/timesheets'
+      fullPath: '/user/timesheets/'
+      preLoaderRoute: typeof UserTimesheetsIndexRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/tasks/': {
+      id: '/user/tasks/'
+      path: '/tasks'
+      fullPath: '/user/tasks/'
+      preLoaderRoute: typeof UserTasksIndexRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/user/leaves/': {
+      id: '/user/leaves/'
+      path: '/leaves'
+      fullPath: '/user/leaves/'
+      preLoaderRoute: typeof UserLeavesIndexRouteImport
+      parentRoute: typeof UserRoute
+    }
+    '/admin/timesheets/': {
+      id: '/admin/timesheets/'
+      path: '/'
+      fullPath: '/admin/timesheets/'
+      preLoaderRoute: typeof AdminTimesheetsIndexRouteImport
+      parentRoute: typeof AdminTimesheetsRoute
+    }
+    '/admin/tasks/': {
+      id: '/admin/tasks/'
+      path: '/tasks'
+      fullPath: '/admin/tasks/'
+      preLoaderRoute: typeof AdminTasksIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/resources/': {
+      id: '/admin/resources/'
+      path: '/resources'
+      fullPath: '/admin/resources/'
+      preLoaderRoute: typeof AdminResourcesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports/': {
+      id: '/admin/reports/'
+      path: '/reports'
+      fullPath: '/admin/reports/'
+      preLoaderRoute: typeof AdminReportsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/projects/': {
+      id: '/admin/projects/'
+      path: '/projects'
+      fullPath: '/admin/projects/'
+      preLoaderRoute: typeof AdminProjectsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payslips/': {
+      id: '/admin/payslips/'
+      path: '/payslips'
+      fullPath: '/admin/payslips/'
+      preLoaderRoute: typeof AdminPayslipsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/clients/': {
+      id: '/admin/clients/'
+      path: '/clients'
+      fullPath: '/admin/clients/'
+      preLoaderRoute: typeof AdminClientsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/announcements/': {
+      id: '/admin/announcements/'
       path: '/announcements'
-      fullPath: '/admin/announcements'
-      preLoaderRoute: typeof AdminAnnouncementsRouteImport
+      fullPath: '/admin/announcements/'
+      preLoaderRoute: typeof AdminAnnouncementsIndexRouteImport
       parentRoute: typeof AdminRoute
     }
     '/user/timesheets/new': {
       id: '/user/timesheets/new'
-      path: '/new'
+      path: '/timesheets/new'
       fullPath: '/user/timesheets/new'
       preLoaderRoute: typeof UserTimesheetsNewRouteImport
-      parentRoute: typeof UserTimesheetsRoute
+      parentRoute: typeof UserRoute
     }
     '/user/tasks/$id': {
       id: '/user/tasks/$id'
-      path: '/$id'
+      path: '/tasks/$id'
       fullPath: '/user/tasks/$id'
       preLoaderRoute: typeof UserTasksIdRouteImport
-      parentRoute: typeof UserTasksRoute
+      parentRoute: typeof UserRoute
     }
     '/user/leaves/apply': {
       id: '/user/leaves/apply'
-      path: '/apply'
+      path: '/leaves/apply'
       fullPath: '/user/leaves/apply'
       preLoaderRoute: typeof UserLeavesApplyRouteImport
-      parentRoute: typeof UserLeavesRoute
+      parentRoute: typeof UserRoute
+    }
+    '/admin/timesheets/$id': {
+      id: '/admin/timesheets/$id'
+      path: '/$id'
+      fullPath: '/admin/timesheets/$id'
+      preLoaderRoute: typeof AdminTimesheetsIdRouteImport
+      parentRoute: typeof AdminTimesheetsRoute
     }
     '/admin/tasks/new': {
       id: '/admin/tasks/new'
-      path: '/new'
+      path: '/tasks/new'
       fullPath: '/admin/tasks/new'
       preLoaderRoute: typeof AdminTasksNewRouteImport
-      parentRoute: typeof AdminTasksRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/tasks/$id': {
       id: '/admin/tasks/$id'
-      path: '/$id'
+      path: '/tasks/$id'
       fullPath: '/admin/tasks/$id'
       preLoaderRoute: typeof AdminTasksIdRouteImport
-      parentRoute: typeof AdminTasksRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/resources/pending': {
       id: '/admin/resources/pending'
-      path: '/pending'
+      path: '/resources/pending'
       fullPath: '/admin/resources/pending'
       preLoaderRoute: typeof AdminResourcesPendingRouteImport
-      parentRoute: typeof AdminResourcesRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/resources/$id': {
       id: '/admin/resources/$id'
-      path: '/$id'
+      path: '/resources/$id'
       fullPath: '/admin/resources/$id'
       preLoaderRoute: typeof AdminResourcesIdRouteImport
-      parentRoute: typeof AdminResourcesRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/reports/visa-expiry': {
       id: '/admin/reports/visa-expiry'
-      path: '/visa-expiry'
+      path: '/reports/visa-expiry'
       fullPath: '/admin/reports/visa-expiry'
       preLoaderRoute: typeof AdminReportsVisaExpiryRouteImport
-      parentRoute: typeof AdminReportsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/reports/passport-expiry': {
       id: '/admin/reports/passport-expiry'
-      path: '/passport-expiry'
+      path: '/reports/passport-expiry'
       fullPath: '/admin/reports/passport-expiry'
       preLoaderRoute: typeof AdminReportsPassportExpiryRouteImport
-      parentRoute: typeof AdminReportsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/reports/address-change': {
       id: '/admin/reports/address-change'
-      path: '/address-change'
+      path: '/reports/address-change'
       fullPath: '/admin/reports/address-change'
       preLoaderRoute: typeof AdminReportsAddressChangeRouteImport
-      parentRoute: typeof AdminReportsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/projects/new': {
       id: '/admin/projects/new'
-      path: '/new'
+      path: '/projects/new'
       fullPath: '/admin/projects/new'
       preLoaderRoute: typeof AdminProjectsNewRouteImport
-      parentRoute: typeof AdminProjectsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/payslips/new': {
       id: '/admin/payslips/new'
-      path: '/new'
+      path: '/payslips/new'
       fullPath: '/admin/payslips/new'
       preLoaderRoute: typeof AdminPayslipsNewRouteImport
-      parentRoute: typeof AdminPayslipsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/clients/new': {
       id: '/admin/clients/new'
-      path: '/new'
+      path: '/clients/new'
       fullPath: '/admin/clients/new'
       preLoaderRoute: typeof AdminClientsNewRouteImport
-      parentRoute: typeof AdminClientsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/clients/$id': {
       id: '/admin/clients/$id'
-      path: '/$id'
+      path: '/clients/$id'
       fullPath: '/admin/clients/$id'
       preLoaderRoute: typeof AdminClientsIdRouteImport
-      parentRoute: typeof AdminClientsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/announcements/new': {
       id: '/admin/announcements/new'
-      path: '/new'
+      path: '/announcements/new'
       fullPath: '/admin/announcements/new'
       preLoaderRoute: typeof AdminAnnouncementsNewRouteImport
-      parentRoute: typeof AdminAnnouncementsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/projects/$id/edit': {
       id: '/admin/projects/$id/edit'
-      path: '/$id/edit'
+      path: '/projects/$id/edit'
       fullPath: '/admin/projects/$id/edit'
       preLoaderRoute: typeof AdminProjectsIdEditRouteImport
-      parentRoute: typeof AdminProjectsRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/clients/$id/edit': {
       id: '/admin/clients/$id/edit'
@@ -778,16 +833,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AdminAnnouncementsRouteChildren {
-  AdminAnnouncementsNewRoute: typeof AdminAnnouncementsNewRoute
+interface AdminTimesheetsRouteChildren {
+  AdminTimesheetsIdRoute: typeof AdminTimesheetsIdRoute
+  AdminTimesheetsIndexRoute: typeof AdminTimesheetsIndexRoute
 }
 
-const AdminAnnouncementsRouteChildren: AdminAnnouncementsRouteChildren = {
-  AdminAnnouncementsNewRoute: AdminAnnouncementsNewRoute,
+const AdminTimesheetsRouteChildren: AdminTimesheetsRouteChildren = {
+  AdminTimesheetsIdRoute: AdminTimesheetsIdRoute,
+  AdminTimesheetsIndexRoute: AdminTimesheetsIndexRoute,
 }
 
-const AdminAnnouncementsRouteWithChildren =
-  AdminAnnouncementsRoute._addFileChildren(AdminAnnouncementsRouteChildren)
+const AdminTimesheetsRouteWithChildren = AdminTimesheetsRoute._addFileChildren(
+  AdminTimesheetsRouteChildren,
+)
 
 interface AdminClientsIdRouteChildren {
   AdminClientsIdEditRoute: typeof AdminClientsIdEditRoute
@@ -801,174 +859,88 @@ const AdminClientsIdRouteWithChildren = AdminClientsIdRoute._addFileChildren(
   AdminClientsIdRouteChildren,
 )
 
-interface AdminClientsRouteChildren {
+interface AdminRouteChildren {
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
+  AdminLeavesRoute: typeof AdminLeavesRoute
+  AdminProfileRoute: typeof AdminProfileRoute
+  AdminTimesheetsRoute: typeof AdminTimesheetsRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminAnnouncementsNewRoute: typeof AdminAnnouncementsNewRoute
   AdminClientsIdRoute: typeof AdminClientsIdRouteWithChildren
   AdminClientsNewRoute: typeof AdminClientsNewRoute
-}
-
-const AdminClientsRouteChildren: AdminClientsRouteChildren = {
-  AdminClientsIdRoute: AdminClientsIdRouteWithChildren,
-  AdminClientsNewRoute: AdminClientsNewRoute,
-}
-
-const AdminClientsRouteWithChildren = AdminClientsRoute._addFileChildren(
-  AdminClientsRouteChildren,
-)
-
-interface AdminPayslipsRouteChildren {
   AdminPayslipsNewRoute: typeof AdminPayslipsNewRoute
-}
-
-const AdminPayslipsRouteChildren: AdminPayslipsRouteChildren = {
-  AdminPayslipsNewRoute: AdminPayslipsNewRoute,
-}
-
-const AdminPayslipsRouteWithChildren = AdminPayslipsRoute._addFileChildren(
-  AdminPayslipsRouteChildren,
-)
-
-interface AdminProjectsRouteChildren {
   AdminProjectsNewRoute: typeof AdminProjectsNewRoute
-  AdminProjectsIdEditRoute: typeof AdminProjectsIdEditRoute
-}
-
-const AdminProjectsRouteChildren: AdminProjectsRouteChildren = {
-  AdminProjectsNewRoute: AdminProjectsNewRoute,
-  AdminProjectsIdEditRoute: AdminProjectsIdEditRoute,
-}
-
-const AdminProjectsRouteWithChildren = AdminProjectsRoute._addFileChildren(
-  AdminProjectsRouteChildren,
-)
-
-interface AdminReportsRouteChildren {
   AdminReportsAddressChangeRoute: typeof AdminReportsAddressChangeRoute
   AdminReportsPassportExpiryRoute: typeof AdminReportsPassportExpiryRoute
   AdminReportsVisaExpiryRoute: typeof AdminReportsVisaExpiryRoute
-}
-
-const AdminReportsRouteChildren: AdminReportsRouteChildren = {
-  AdminReportsAddressChangeRoute: AdminReportsAddressChangeRoute,
-  AdminReportsPassportExpiryRoute: AdminReportsPassportExpiryRoute,
-  AdminReportsVisaExpiryRoute: AdminReportsVisaExpiryRoute,
-}
-
-const AdminReportsRouteWithChildren = AdminReportsRoute._addFileChildren(
-  AdminReportsRouteChildren,
-)
-
-interface AdminResourcesRouteChildren {
   AdminResourcesIdRoute: typeof AdminResourcesIdRoute
   AdminResourcesPendingRoute: typeof AdminResourcesPendingRoute
-}
-
-const AdminResourcesRouteChildren: AdminResourcesRouteChildren = {
-  AdminResourcesIdRoute: AdminResourcesIdRoute,
-  AdminResourcesPendingRoute: AdminResourcesPendingRoute,
-}
-
-const AdminResourcesRouteWithChildren = AdminResourcesRoute._addFileChildren(
-  AdminResourcesRouteChildren,
-)
-
-interface AdminTasksRouteChildren {
   AdminTasksIdRoute: typeof AdminTasksIdRoute
   AdminTasksNewRoute: typeof AdminTasksNewRoute
-}
-
-const AdminTasksRouteChildren: AdminTasksRouteChildren = {
-  AdminTasksIdRoute: AdminTasksIdRoute,
-  AdminTasksNewRoute: AdminTasksNewRoute,
-}
-
-const AdminTasksRouteWithChildren = AdminTasksRoute._addFileChildren(
-  AdminTasksRouteChildren,
-)
-
-interface AdminRouteChildren {
-  AdminAnnouncementsRoute: typeof AdminAnnouncementsRouteWithChildren
-  AdminClientsRoute: typeof AdminClientsRouteWithChildren
-  AdminLeavesRoute: typeof AdminLeavesRoute
-  AdminPayslipsRoute: typeof AdminPayslipsRouteWithChildren
-  AdminProfileRoute: typeof AdminProfileRoute
-  AdminProjectsRoute: typeof AdminProjectsRouteWithChildren
-  AdminReportsRoute: typeof AdminReportsRouteWithChildren
-  AdminResourcesRoute: typeof AdminResourcesRouteWithChildren
-  AdminTasksRoute: typeof AdminTasksRouteWithChildren
-  AdminTimesheetsRoute: typeof AdminTimesheetsRoute
-  AdminIndexRoute: typeof AdminIndexRoute
+  AdminAnnouncementsIndexRoute: typeof AdminAnnouncementsIndexRoute
+  AdminClientsIndexRoute: typeof AdminClientsIndexRoute
+  AdminPayslipsIndexRoute: typeof AdminPayslipsIndexRoute
+  AdminProjectsIndexRoute: typeof AdminProjectsIndexRoute
+  AdminReportsIndexRoute: typeof AdminReportsIndexRoute
+  AdminResourcesIndexRoute: typeof AdminResourcesIndexRoute
+  AdminTasksIndexRoute: typeof AdminTasksIndexRoute
+  AdminProjectsIdEditRoute: typeof AdminProjectsIdEditRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminAnnouncementsRoute: AdminAnnouncementsRouteWithChildren,
-  AdminClientsRoute: AdminClientsRouteWithChildren,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminLeavesRoute: AdminLeavesRoute,
-  AdminPayslipsRoute: AdminPayslipsRouteWithChildren,
   AdminProfileRoute: AdminProfileRoute,
-  AdminProjectsRoute: AdminProjectsRouteWithChildren,
-  AdminReportsRoute: AdminReportsRouteWithChildren,
-  AdminResourcesRoute: AdminResourcesRouteWithChildren,
-  AdminTasksRoute: AdminTasksRouteWithChildren,
-  AdminTimesheetsRoute: AdminTimesheetsRoute,
+  AdminTimesheetsRoute: AdminTimesheetsRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
+  AdminAnnouncementsNewRoute: AdminAnnouncementsNewRoute,
+  AdminClientsIdRoute: AdminClientsIdRouteWithChildren,
+  AdminClientsNewRoute: AdminClientsNewRoute,
+  AdminPayslipsNewRoute: AdminPayslipsNewRoute,
+  AdminProjectsNewRoute: AdminProjectsNewRoute,
+  AdminReportsAddressChangeRoute: AdminReportsAddressChangeRoute,
+  AdminReportsPassportExpiryRoute: AdminReportsPassportExpiryRoute,
+  AdminReportsVisaExpiryRoute: AdminReportsVisaExpiryRoute,
+  AdminResourcesIdRoute: AdminResourcesIdRoute,
+  AdminResourcesPendingRoute: AdminResourcesPendingRoute,
+  AdminTasksIdRoute: AdminTasksIdRoute,
+  AdminTasksNewRoute: AdminTasksNewRoute,
+  AdminAnnouncementsIndexRoute: AdminAnnouncementsIndexRoute,
+  AdminClientsIndexRoute: AdminClientsIndexRoute,
+  AdminPayslipsIndexRoute: AdminPayslipsIndexRoute,
+  AdminProjectsIndexRoute: AdminProjectsIndexRoute,
+  AdminReportsIndexRoute: AdminReportsIndexRoute,
+  AdminResourcesIndexRoute: AdminResourcesIndexRoute,
+  AdminTasksIndexRoute: AdminTasksIndexRoute,
+  AdminProjectsIdEditRoute: AdminProjectsIdEditRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface UserLeavesRouteChildren {
-  UserLeavesApplyRoute: typeof UserLeavesApplyRoute
-}
-
-const UserLeavesRouteChildren: UserLeavesRouteChildren = {
-  UserLeavesApplyRoute: UserLeavesApplyRoute,
-}
-
-const UserLeavesRouteWithChildren = UserLeavesRoute._addFileChildren(
-  UserLeavesRouteChildren,
-)
-
-interface UserTasksRouteChildren {
-  UserTasksIdRoute: typeof UserTasksIdRoute
-}
-
-const UserTasksRouteChildren: UserTasksRouteChildren = {
-  UserTasksIdRoute: UserTasksIdRoute,
-}
-
-const UserTasksRouteWithChildren = UserTasksRoute._addFileChildren(
-  UserTasksRouteChildren,
-)
-
-interface UserTimesheetsRouteChildren {
-  UserTimesheetsNewRoute: typeof UserTimesheetsNewRoute
-}
-
-const UserTimesheetsRouteChildren: UserTimesheetsRouteChildren = {
-  UserTimesheetsNewRoute: UserTimesheetsNewRoute,
-}
-
-const UserTimesheetsRouteWithChildren = UserTimesheetsRoute._addFileChildren(
-  UserTimesheetsRouteChildren,
-)
-
 interface UserRouteChildren {
   UserAnnouncementsRoute: typeof UserAnnouncementsRoute
-  UserLeavesRoute: typeof UserLeavesRouteWithChildren
   UserPayslipsRoute: typeof UserPayslipsRoute
   UserProfileRoute: typeof UserProfileRoute
-  UserTasksRoute: typeof UserTasksRouteWithChildren
-  UserTimesheetsRoute: typeof UserTimesheetsRouteWithChildren
   UserIndexRoute: typeof UserIndexRoute
+  UserLeavesApplyRoute: typeof UserLeavesApplyRoute
+  UserTasksIdRoute: typeof UserTasksIdRoute
+  UserTimesheetsNewRoute: typeof UserTimesheetsNewRoute
+  UserLeavesIndexRoute: typeof UserLeavesIndexRoute
+  UserTasksIndexRoute: typeof UserTasksIndexRoute
+  UserTimesheetsIndexRoute: typeof UserTimesheetsIndexRoute
 }
 
 const UserRouteChildren: UserRouteChildren = {
   UserAnnouncementsRoute: UserAnnouncementsRoute,
-  UserLeavesRoute: UserLeavesRouteWithChildren,
   UserPayslipsRoute: UserPayslipsRoute,
   UserProfileRoute: UserProfileRoute,
-  UserTasksRoute: UserTasksRouteWithChildren,
-  UserTimesheetsRoute: UserTimesheetsRouteWithChildren,
   UserIndexRoute: UserIndexRoute,
+  UserLeavesApplyRoute: UserLeavesApplyRoute,
+  UserTasksIdRoute: UserTasksIdRoute,
+  UserTimesheetsNewRoute: UserTimesheetsNewRoute,
+  UserLeavesIndexRoute: UserLeavesIndexRoute,
+  UserTasksIndexRoute: UserTasksIndexRoute,
+  UserTimesheetsIndexRoute: UserTimesheetsIndexRoute,
 }
 
 const UserRouteWithChildren = UserRoute._addFileChildren(UserRouteChildren)
@@ -982,3 +954,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

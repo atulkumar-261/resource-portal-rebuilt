@@ -23,7 +23,13 @@ export interface Resource {
   emergencyPhone: string;
   emergencyEmail: string;
   emergencyAddress: string;
-  status: "active" | "pending";
+  status: "active" | "pending" | "resigned" | "terminated";
+  avatarUrl?: string;
+  totalLeaves?: number;
+  weeklyAllowedHours?: number;
+  oldAddressLog?: string;
+  performanceNotes?: string;
+  assignedProjects?: string[];
 }
 
 export interface Client {
@@ -75,7 +81,9 @@ export interface Timesheet {
   weekNumber: number;
   weekEndDate: string;
   totalHours: number;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "deleted" | "in draft";
+  projectName?: string;
+  dailyHours?: number[];
 }
 
 export interface Payslip {

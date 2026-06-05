@@ -1,26 +1,65 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
+import { DataTable } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useRMS } from "@/lib/store";
+import type { ColumnDef } from "@tanstack/react-table";
+import type { Client } from "@/lib/types";
+import { Eye, Pencil, Trash2, Plus, Search, User } from "lucide-react";
 import { useState } from "react";
-import { Search, User } from "lucide-react";
 
-export const Route = createFileRoute("/admin/clients/$id")({ component: ViewClient });
+export const Route = createFileRoute("/admin/clients/")({ component: ClientsPage });
 
-function ViewClient() {
-  const { id } = Route.useParams();
-  const client = useRMS((s) => s.clients.find((c) => c.id === id));
+function ClientsPage() {
+  const clients = useRMS((s) => s.clients);
+  const deleteClient = useRMS((s) => s.deleteClient);
   const resources = useRMS((s) => s.resources);
+  const router = useRouter();
 
   // Sidebar search state
   const [searchQuery, setSearchQuery] = useState("");
 
-  if (!client)
-    return (
-      <PageCard title="Client">
-        <p>Not found.</p>
-      </PageCard>
-    );
+  const columns: ColumnDef<Client, any>[] = [
+    { header: "Name", accessorKey: "name" },
+    { header: "Contact Person", accessorKey: "contactPerson" },
+    { header: "Email", accessorKey: "email" },
+    { header: "Phone", accessorKey: "phone" },
+    {
+      header: "Actions",
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              router.navigate({ to: "/admin/clients/$id", params: { id: row.original.id } })
+            }
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              router.navigate({ to: "/admin/clients/$id/edit", params: { id: row.original.id } })
+            }
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <ConfirmDialog
+            trigger={
+              <Button size="sm" variant="ghost" className="text-rose-600">
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            }
+            onConfirm={() => deleteClient(row.original.id)}
+          />
+        </div>
+      ),
+    },
+  ];
 
   // Sidebar active resources filter
   const activeResources = resources.filter((r) => r.status === "active");
@@ -32,40 +71,19 @@ function ViewClient() {
 
   return (
     <div className="grid lg:grid-cols-12 gap-8">
-      {/* Left Column: Client Details */}
+      {/* Left Column: Clients List */}
       <div className="lg:col-span-8">
         <PageCard
-          title={`Client — ${client.name}`}
+          title="Clients"
           actions={
             <Button size="sm" asChild>
-              <Link to="/admin/clients/$id/edit" params={{ id }}>
-                Edit
+              <Link to="/admin/clients/new">
+                <Plus className="w-4 h-4" /> New Client
               </Link>
             </Button>
           }
         >
-          <dl className="grid md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <dt className="text-slate-500">Name</dt>
-              <dd className="font-medium">{client.name}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Contact Person</dt>
-              <dd className="font-medium">{client.contactPerson}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Email</dt>
-              <dd className="font-medium">{client.email}</dd>
-            </div>
-            <div>
-              <dt className="text-slate-500">Phone</dt>
-              <dd className="font-medium">{client.phone}</dd>
-            </div>
-            <div className="md:col-span-2">
-              <dt className="text-slate-500">Address</dt>
-              <dd className="font-medium">{client.address}</dd>
-            </div>
-          </dl>
+          <DataTable data={clients} columns={columns} searchPlaceholder="Search clients..." />
         </PageCard>
       </div>
 
