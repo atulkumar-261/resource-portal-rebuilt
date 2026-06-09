@@ -17,7 +17,7 @@ import { Eye, Trash2, Plus, Download } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Task } from "@/lib/types";
 
-export const Route = createFileRoute('/admin/tasks/')({ component: TasksPage });
+export const Route = createFileRoute("/admin/tasks/")({ component: TasksPage });
 
 function TasksPage() {
   const tasks = useRMS((s) => s.tasks);
@@ -51,13 +51,13 @@ function TasksPage() {
     },
     { header: "Resource", accessorKey: "resourceName" },
     { header: "Project", accessorKey: "project" },
-    { header: "Date", accessorKey: "startDate" },
+    { header: "Start Date", accessorKey: "startDate" },
     {
       header: "Status",
       accessorKey: "status",
       cell: ({ getValue }) => (
         <Badge variant="secondary" className="capitalize">
-          {String(getValue())}
+          {String(getValue()).replace(/-/g, " ")}
         </Badge>
       ),
     },

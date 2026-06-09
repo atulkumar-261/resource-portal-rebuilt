@@ -1,0 +1,689 @@
+from typing import List, Optional
+from uuid import UUID
+from datetime import datetime, date, timedelta
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from pydantic import BaseModel, Field, field_validator
+
+from backend.app.models.database import (
+    Resource,
+    ResourceAddress,
+    ResourceBankDetails,
+    ResourceEmergencyContact,
+    ResourceDocument,
+    Department,
+    Designation,
+    User,
+    Role,
+    ResourceStatus,
+    TaskScheduleEntry,
+    AuditLog
+)
+from backend.app.core.config import get_db_session
+from backend.app.core.security import require_privileged_user, require_current_user, hash_password
+from backend.app.api.admin_users import _generate_password
+from backend.app.services.progress_service import ProgressService
+
+router = APIRouter(prefix="/resources", tags=["Resources"])
+
+
+class ResourceCreateRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, max_length=150)
+    email: str = Field(..., max_length=255)
+    department_id: UUID
+    designation_id: UUID
+    skills: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        if not value or "@" not in value or "." not in value.split("@")[-1]:
+            raise ValueError("Enter a valid email address.")
+        return value.lower()
+
+
+class ResourceStatusUpdateRequest(BaseModel):
+    is_active: bool
+
+
+class ResourceUpdateRequest(BaseModel):
+    skillset: Optional[str] = None
+    status: Optional[str] = None
+    weekly_allowed_hours: Optional[int] = None
+    performance_notes: Optional[str] = None
+
+
+class SelfProfileUpdateRequest(BaseModel):
+    """Fields a resource can update on their own profile."""
+    phone: Optional[str] = None
+    dob: Optional[str] = None  # ISO format YYYY-MM-DD
+    ni_number: Optional[str] = None
+    nationality: Optional[str] = None
+    passport_number: Optional[str] = None
+    passport_expiry: Optional[str] = None
+    visa_number: Optional[str] = None
+    visa_expiry: Optional[str] = None
+    skillset: Optional[str] = None
+    other_info: Optional[str] = None
+    # Address sub-object
+    current_address: Optional[str] = None
+    city_id: Optional[UUID] = None
+    citizen_of_id: Optional[UUID] = None
+    # Emergency contact sub-object
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    emergency_contact_email: Optional[str] = None
+    emergency_contact_address: Optional[str] = None
+    # Bank details sub-object
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    sort_code: Optional[str] = None
+
+
+@router.get("/")
+def get_resources_grid(status: Optional[str] = None, db: Session = Depends(get_db_session)):
+    query = db.query(Resource).filter(Resource.is_deleted == False)
+    if status:
+        query = query.filter(Resource.status == status)
+    return query.all()
+
+
+@router.get("/pending")
+def get_pending_resources(db: Session = Depends(get_db_session)):
+    return db.query(Resource).filter(Resource.status == "pending", Resource.is_deleted == False).all()
+
+
+@router.get("/meta/departments")
+def get_departments(db: Session = Depends(get_db_session)):
+    return db.query(Department).all()
+
+
+@router.get("/meta/designations")
+def get_designations(db: Session = Depends(get_db_session)):
+    return db.query(Designation).all()
+
+
+@router.get("/{resource_id}")
+def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session)):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+
+    # ── Recalculate profile completion live ──
+    completion_data = ProgressService.calculate_profile_completion(resource, db)
+    db.commit()
+
+    # ── Current week utilization calculation (Mon → Sun) ──
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())  # Monday
+    end_of_week = start_of_week + timedelta(days=6)          # Sunday
+    planned_this_week = db.query(func.coalesce(func.sum(TaskScheduleEntry.planned_hours), 0)).filter(
+        TaskScheduleEntry.resource_id == resource_id,
+        TaskScheduleEntry.work_date >= start_of_week,
+        TaskScheduleEntry.work_date <= end_of_week,
+    ).scalar()
+    weekly_allowed = resource.weekly_allowed_hours or 35
+    utilization_pct = round((float(planned_this_week) / weekly_allowed) * 100, 1) if weekly_allowed > 0 else 0.0
+    available_capacity = max(0.0, float(weekly_allowed) - float(planned_this_week))
+
+    # Build enriched response
+    return {
+        "resource": resource,
+        "profile_completion_percentage": completion_data["completion_percentage"],
+        "onboarding_status": completion_data["onboarding_status"],
+        "missing_fields": completion_data["missing_fields"],
+        "current_utilization": utilization_pct,
+        "available_capacity_hours": round(available_capacity, 1),
+    }
+
+
+@router.put("/{resource_id}/approve")
+def approve_pending_resource(resource_id: UUID, db: Session = Depends(get_db_session)):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+    
+    resource.status = "active"
+    db.add(resource)
+    db.commit()
+    return {"id": resource.id, "status": "active", "message": "Resource onboarded successfully."}
+
+
+def _generate_resource_username(db: Session) -> str:
+    users = db.query(User.username).filter(User.username.like("res_%")).all()
+    numbers = []
+    for (uname,) in users:
+        parts = uname.split("_")
+        if len(parts) == 2 and parts[1].isdigit():
+            numbers.append(int(parts[1]))
+    next_num = max(numbers) + 1 if numbers else 1
+    return f"res_{next_num:05d}"
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+def create_resource(
+    request: ResourceCreateRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    try:
+        # Check duplicate email in both User and Resource tables
+        email = request.email.lower()
+        exists_user = db.query(User).filter(User.email == email).first()
+        exists_res = db.query(Resource).filter(Resource.email == email).first()
+        if exists_user or exists_res:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
+
+        # 1. Generate unique sequential username
+        username_gen = _generate_resource_username(db)
+        
+        # 2. Get active resource status
+        active_status = db.query(ResourceStatus).filter(ResourceStatus.name == "active").first()
+        if not active_status:
+            active_status = ResourceStatus(name="active")
+            db.add(active_status)
+            db.flush()
+        
+        # 3. Generate unique employee_id (e.g. EMP-XXXXX)
+        import random
+        employee_id = f"EMP-{random.randint(10000, 99999)}"
+        while db.query(Resource).filter(Resource.employee_id == employee_id).first():
+            employee_id = f"EMP-{random.randint(10000, 99999)}"
+        
+        # 4. Create Resource profile
+        resource = Resource(
+            employee_id=employee_id,
+            full_name=request.full_name,
+            designation_id=request.designation_id,
+            department_id=request.department_id,
+            email=email,
+            status_id=active_status.id,
+            skillset=request.skills,
+            is_deleted=False
+        )
+        db.add(resource)
+        db.flush()
+        
+        # 5. Generate credentials
+        password_raw = _generate_password(request.full_name)
+        password_hash = hash_password(password_raw)
+        
+        # Fetch resource role
+        resource_role = db.query(Role).filter(Role.name == "resource").first()
+        if not resource_role:
+            resource_role = Role(name="resource", description="Regular Resource Employee")
+            db.add(resource_role)
+            db.flush()
+        
+        # 6. Create User account
+        user = User(
+            username=username_gen,
+            email=email,
+            full_name=request.full_name,
+            role_id=resource_role.id,
+            resource_id=resource.id,
+            password_hash=password_hash,
+            is_active=True
+        )
+        db.add(user)
+        db.flush()
+        
+        # Audit Log
+        db.add(
+            AuditLog(
+                module="user_management",
+                action="resource_created",
+                table_name="users",
+                record_id=user.id,
+                new_value={
+                    "id": str(user.id),
+                    "username": user.username,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "role": "resource",
+                    "resource_id": str(resource.id)
+                },
+                user_id=current_user.id
+            )
+        )
+        db.commit()
+        db.refresh(resource)
+        db.refresh(user)
+        
+        return {
+            "resource": {
+                "id": str(resource.id),
+                "employee_id": resource.employee_id,
+                "full_name": resource.full_name,
+                "email": resource.email,
+                "skillset": resource.skillset,
+                "status": "active"
+            },
+            "credentials": {
+                "username": user.username,
+                "email": user.email,
+                "password": password_raw
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        raise e
+
+
+@router.get("/{resource_id}/login")
+def get_resource_login_status(
+    resource_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+        
+    user = db.query(User).filter(User.resource_id == resource_id).first()
+    if not user:
+        return {"has_account": False}
+    return {
+        "has_account": True,
+        "username": user.username,
+        "email": user.email,
+        "role": "resource",
+        "is_active": user.is_active,
+        "last_login": user.last_login
+    }
+
+
+@router.post("/{resource_id}/reset-password")
+def reset_resource_password(
+    resource_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+        
+    user = db.query(User).filter(User.resource_id == resource_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Login credentials not found for this resource.")
+        
+    new_password_raw = _generate_password(user.full_name or "Resource")
+    old_val = {
+        "id": str(user.id),
+        "username": user.username,
+        "is_active": user.is_active
+    }
+    
+    user.password_hash = hash_password(new_password_raw)
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.flush()
+    
+    # Audit log
+    db.add(
+        AuditLog(
+            module="user_management",
+            action="resource_password_reset",
+            table_name="users",
+            record_id=user.id,
+            old_value=old_val,
+            new_value={
+                "id": str(user.id),
+                "username": user.username,
+                "is_active": user.is_active
+            },
+            changed_fields={"password_reset": True},
+            user_id=current_user.id
+        )
+    )
+    db.commit()
+    
+    return {
+        "status": "success",
+        "password": new_password_raw
+    }
+
+
+@router.patch("/{resource_id}/status")
+def update_resource_login_status(
+    resource_id: UUID,
+    request: ResourceStatusUpdateRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+        
+    user = db.query(User).filter(User.resource_id == resource_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Login credentials not found.")
+        
+    if user.is_active == request.is_active:
+        return {"status": "success", "is_active": user.is_active}
+        
+    old_val = {
+        "id": str(user.id),
+        "username": user.username,
+        "is_active": user.is_active
+    }
+    user.is_active = request.is_active
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.flush()
+    
+    action = "resource_activated" if request.is_active else "resource_deactivated"
+    db.add(
+        AuditLog(
+            module="user_management",
+            action=action,
+            table_name="users",
+            record_id=user.id,
+            old_value=old_val,
+            new_value={
+                "id": str(user.id),
+                "username": user.username,
+                "is_active": user.is_active
+            },
+            changed_fields={"is_active": {"old": old_val["is_active"], "new": request.is_active}},
+            user_id=current_user.id
+        )
+    )
+    db.commit()
+    return {"status": "success", "is_active": user.is_active}
+
+
+@router.delete("/{resource_id}")
+def delete_resource(
+    resource_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+        
+    # Soft-delete the Resource profile
+    resource.is_deleted = True
+    resource.deleted_at = datetime.utcnow()
+    resource.deleted_by = current_user.id
+    db.add(resource)
+    db.flush()
+    
+    # Deactivate the linked User account
+    user = db.query(User).filter(User.resource_id == resource_id).first()
+    user_id = None
+    old_val = None
+    if user:
+        user_id = user.id
+        old_val = {
+            "id": str(user.id),
+            "username": user.username,
+            "is_active": user.is_active
+        }
+        user.is_active = False
+        user.updated_at = datetime.utcnow()
+        db.add(user)
+        db.flush()
+        
+    # Audit log
+    db.add(
+        AuditLog(
+            module="user_management",
+            action="resource_deleted",
+            table_name="users",
+            record_id=user_id or resource_id,
+            old_value=old_val,
+            changed_fields={"deleted": True, "is_active": False},
+            user_id=current_user.id
+        )
+    )
+    db.commit()
+    return {"status": "success", "message": "Resource profile soft-deleted and credentials deactivated successfully."}
+
+
+@router.put("/{resource_id}")
+def update_resource(
+    resource_id: UUID,
+    request: ResourceUpdateRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+        
+    old_val = {
+        "id": str(resource.id),
+        "skillset": resource.skillset,
+        "weekly_allowed_hours": resource.weekly_allowed_hours,
+        "performance_notes": resource.performance_notes,
+    }
+    
+    if request.skillset is not None:
+        resource.skillset = request.skillset
+    if request.weekly_allowed_hours is not None:
+        resource.weekly_allowed_hours = request.weekly_allowed_hours
+    if request.performance_notes is not None:
+        resource.performance_notes = request.performance_notes
+        
+    if request.status is not None:
+        res_status = db.query(ResourceStatus).filter(ResourceStatus.name == request.status).first()
+        if res_status:
+            resource.status_id = res_status.id
+            
+    resource.updated_at = datetime.utcnow()
+    db.add(resource)
+    db.flush()
+    
+    db.add(
+        AuditLog(
+            module="user_management",
+            action="resource_updated",
+            table_name="resources",
+            record_id=resource.id,
+            old_value=old_val,
+            new_value={
+                "id": str(resource.id),
+                "skillset": resource.skillset,
+                "weekly_allowed_hours": resource.weekly_allowed_hours,
+                "performance_notes": resource.performance_notes,
+            },
+            user_id=current_user.id
+        )
+    )
+    db.commit()
+    db.refresh(resource)
+    return resource
+
+
+# ==============================================================================
+# SELF-SERVICE PROFILE ENDPOINTS (Resource user)
+# ==============================================================================
+
+@router.put("/profile/self")
+def update_self_profile(
+    request: SelfProfileUpdateRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_current_user),
+):
+    """
+    Resource self-service: update own profile fields, address, bank, emergency contact.
+    Recalculates profile completion and onboarding status after save.
+    """
+    if not current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Only resource accounts can update their own profile.")
+
+    resource = db.query(Resource).filter(
+        Resource.id == current_user.resource_id,
+        Resource.is_deleted == False,
+    ).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+
+    # ─── Direct resource fields ───
+    date_fields_map = {"dob": "dob", "passport_expiry": "passport_expiry", "visa_expiry": "visa_expiry"}
+    simple_fields = ["phone", "ni_number", "nationality", "passport_number", "visa_number", "skillset", "other_info"]
+
+    for f in simple_fields:
+        val = getattr(request, f, None)
+        if val is not None:
+            setattr(resource, f, val)
+
+    for req_field, db_field in date_fields_map.items():
+        val = getattr(request, req_field, None)
+        if val is not None:
+            try:
+                from datetime import date as _date
+                setattr(resource, db_field, _date.fromisoformat(val))
+            except (ValueError, TypeError):
+                pass
+
+    resource.updated_at = datetime.utcnow()
+    db.add(resource)
+    db.flush()
+
+    # ─── Address upsert ───
+    if any([request.current_address, request.city_id, request.citizen_of_id]):
+        addr = db.query(ResourceAddress).filter(ResourceAddress.resource_id == resource.id).first()
+        if addr:
+            if request.current_address is not None:
+                addr.current_address = request.current_address
+            if request.city_id is not None:
+                addr.city_id = request.city_id
+            if request.citizen_of_id is not None:
+                addr.citizen_of_id = request.citizen_of_id
+            db.add(addr)
+        else:
+            # Need city_id and citizen_of_id for new record
+            if request.city_id and request.citizen_of_id:
+                addr = ResourceAddress(
+                    resource_id=resource.id,
+                    current_address=request.current_address or "",
+                    city_id=request.city_id,
+                    citizen_of_id=request.citizen_of_id,
+                )
+                db.add(addr)
+        db.flush()
+
+    # ─── Emergency contact upsert ───
+    if any([request.emergency_contact_name, request.emergency_contact_phone,
+            request.emergency_contact_email, request.emergency_contact_address]):
+        ec = db.query(ResourceEmergencyContact).filter(
+            ResourceEmergencyContact.resource_id == resource.id
+        ).first()
+        if ec:
+            if request.emergency_contact_name is not None:
+                ec.contact_name = request.emergency_contact_name
+            if request.emergency_contact_phone is not None:
+                ec.phone = request.emergency_contact_phone
+            if request.emergency_contact_email is not None:
+                ec.email = request.emergency_contact_email
+            if request.emergency_contact_address is not None:
+                ec.address = request.emergency_contact_address
+            db.add(ec)
+        else:
+            if request.emergency_contact_name and request.emergency_contact_phone:
+                ec = ResourceEmergencyContact(
+                    resource_id=resource.id,
+                    contact_name=request.emergency_contact_name,
+                    phone=request.emergency_contact_phone,
+                    email=request.emergency_contact_email,
+                    address=request.emergency_contact_address,
+                )
+                db.add(ec)
+        db.flush()
+
+    # ─── Bank details upsert ───
+    if any([request.bank_name, request.account_number, request.sort_code]):
+        bank = db.query(ResourceBankDetails).filter(
+            ResourceBankDetails.resource_id == resource.id
+        ).first()
+        if bank:
+            if request.bank_name is not None:
+                bank.bank_name = request.bank_name
+            if request.account_number is not None:
+                bank.account_number = request.account_number
+            if request.sort_code is not None:
+                bank.sort_code = request.sort_code
+            db.add(bank)
+        else:
+            if request.bank_name and request.account_number and request.sort_code:
+                bank = ResourceBankDetails(
+                    resource_id=resource.id,
+                    bank_name=request.bank_name,
+                    account_number=request.account_number,
+                    sort_code=request.sort_code,
+                )
+                db.add(bank)
+        db.flush()
+
+    # ─── Recalculate profile completion ───
+    completion_data = ProgressService.calculate_profile_completion(resource, db)
+    db.commit()
+    db.refresh(resource)
+
+    return {
+        "status": "success",
+        "resource_id": str(resource.id),
+        "profile_completion_percentage": completion_data["completion_percentage"],
+        "onboarding_status": completion_data["onboarding_status"],
+        "missing_fields": completion_data["missing_fields"],
+    }
+
+
+@router.get("/profile/self/completion")
+def get_self_profile_completion(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_current_user),
+):
+    """Returns live profile completion percentage and missing fields checklist."""
+    if not current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Only resource accounts have profile completion.")
+
+    resource = db.query(Resource).filter(
+        Resource.id == current_user.resource_id,
+        Resource.is_deleted == False,
+    ).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+
+    completion_data = ProgressService.calculate_profile_completion(resource, db)
+    db.commit()
+
+    return {
+        "resource_id": str(resource.id),
+        "profile_completion_percentage": completion_data["completion_percentage"],
+        "onboarding_status": completion_data["onboarding_status"],
+        "missing_fields": completion_data["missing_fields"],
+    }
+
+
+@router.put("/{resource_id}/approve-onboarding")
+def approve_resource_onboarding(
+    resource_id: UUID,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user),
+):
+    """Admin/Super Admin sets approval_status to 'approved' for a resource."""
+    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource profile not found.")
+
+    resource.approval_status = "approved"
+    resource.updated_at = datetime.utcnow()
+    db.add(resource)
+
+    db.add(
+        AuditLog(
+            module="user_management",
+            action="resource_approval_granted",
+            table_name="resources",
+            record_id=resource.id,
+            new_value={"approval_status": "approved"},
+            user_id=current_user.id,
+        )
+    )
+    db.commit()
+    return {"status": "success", "resource_id": str(resource.id), "approval_status": "approved"}

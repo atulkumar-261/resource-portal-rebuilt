@@ -154,36 +154,36 @@ function ReportsDashboardPage() {
               Download Records
             </h2>
             <div className="border border-slate-300 rounded overflow-hidden divide-y divide-slate-300">
-              <button
-                onClick={handleDownloadTimesheets}
+              <Link
+                to="/admin/reports/timesheets"
                 className="w-full text-left bg-[#d9d9d9]/70 hover:bg-[#d9d9d9] px-4 py-2.5 text-[#0d7a70] font-semibold text-sm hover:underline transition-colors block focus:outline-none"
               >
-                Timsheet Records
-              </button>
-              <button
-                onClick={handleDownloadPeriodicTimesheets}
+                Timesheet Records
+              </Link>
+              <Link
+                to="/admin/reports/periodic-timesheets"
                 className="w-full text-left bg-white hover:bg-slate-50 px-4 py-2.5 text-[#0d7a70] font-semibold text-sm hover:underline transition-colors block focus:outline-none"
               >
                 Periodic Timesheet Records
-              </button>
-              <button
-                onClick={handleDownloadLeaves}
+              </Link>
+              <Link
+                to="/admin/reports/leaves"
                 className="w-full text-left bg-[#d9d9d9]/70 hover:bg-[#d9d9d9] px-4 py-2.5 text-[#0d7a70] font-semibold text-sm hover:underline transition-colors block focus:outline-none"
               >
                 Leave Records
-              </button>
-              <button
-                onClick={handleDownloadProfiles}
+              </Link>
+              <Link
+                to="/admin/reports/profiles"
                 className="w-full text-left bg-white hover:bg-slate-50 px-4 py-2.5 text-[#0d7a70] font-semibold text-sm hover:underline transition-colors block focus:outline-none"
               >
                 Profile Records
-              </button>
-              <button
-                onClick={handleDownloadOther}
+              </Link>
+              <Link
+                to="/admin/reports/other-documents"
                 className="w-full text-left bg-[#d9d9d9]/70 hover:bg-[#d9d9d9] px-4 py-2.5 text-[#0d7a70] font-semibold text-sm hover:underline transition-colors block focus:outline-none"
               >
                 Other Documents Records
-              </button>
+              </Link>
             </div>
           </div>
         </div>

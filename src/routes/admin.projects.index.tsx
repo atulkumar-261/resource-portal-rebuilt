@@ -29,12 +29,20 @@ function ProjectsPage() {
       <div className="lg:col-span-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-semibold text-teal-800">Current Project</h2>
-          <button
-            onClick={() => router.navigate({ to: "/admin/projects/new" })}
-            className="bg-stone-600 hover:bg-stone-700 text-white px-4 py-2 rounded text-sm font-semibold transition-colors shadow-sm"
-          >
-            Create Project
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => router.navigate({ to: "/admin/projects/new" })}
+              className="bg-stone-600 hover:bg-stone-700 text-white px-4 py-2 rounded text-sm font-semibold transition-colors shadow-sm"
+            >
+              Create Project
+            </button>
+            <button
+              onClick={() => router.navigate({ to: "/admin/projects/new-ai" })}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm font-semibold transition-colors shadow-sm"
+            >
+              Create with AI
+            </button>
+          </div>
         </div>
 
         {/* Project Cards Grid */}
@@ -67,13 +75,22 @@ function ProjectsPage() {
                 <span className="text-xs text-slate-500 font-semibold">
                   Status: <span className="capitalize">{p.status}</span>
                 </span>
-                <Link
-                  to="/admin/projects/$id/edit"
-                  params={{ id: p.id }}
-                  className="text-xs text-teal-600 hover:text-teal-800 font-semibold hover:underline"
-                >
-                  More details &gt;
-                </Link>
+                <div className="flex gap-3">
+                  <Link
+                    to="/admin/projects/$id/edit"
+                    params={{ id: p.id }}
+                    className="text-xs text-slate-500 hover:text-slate-700 font-semibold hover:underline"
+                  >
+                    Edit &gt;
+                  </Link>
+                  <Link
+                    to="/admin/projects/$id/execution"
+                    params={{ id: p.id }}
+                    className="text-xs text-teal-600 hover:text-teal-800 font-semibold hover:underline"
+                  >
+                    Execution &gt;
+                  </Link>
+                </div>
               </div>
             </div>
           ))}

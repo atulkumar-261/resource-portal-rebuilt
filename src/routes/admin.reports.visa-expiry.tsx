@@ -7,7 +7,8 @@ export const Route = createFileRoute("/admin/reports/visa-expiry")({
 });
 
 function AdminreportsvisaexpiryPage() {
-  const resources = useRMS((s) => s.resources.filter((r) => r.visaExpiry));
+  const allResources = useRMS((s) => s.resources);
+  const resources = allResources.filter((r) => r.visaExpiry);
   return (
     <PageCard title="Visa Expiry Report">
       <table className="w-full text-sm border border-slate-200">

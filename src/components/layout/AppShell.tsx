@@ -1,8 +1,10 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useAuth } from "@/lib/store";
 import heroCode from "@/assets/hero-code.jpg";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Lock } from "lucide-react";
+import { DailyReportModal } from "@/components/shared/DailyReportModal";
+import toast from "react-hot-toast";
 
 const adminNav = [
   { to: "/admin", label: "DASHBOARD", exact: true },
@@ -11,11 +13,17 @@ const adminNav = [
   { to: "/admin/clients", label: "CLIENTS" },
   { to: "/admin/projects", label: "PROJECTS" },
   { to: "/admin/resources", label: "RESOURCES" },
+  { to: "/admin/resources/workload", label: "WORKLOAD HEATMAP" },
   { to: "/admin/leaves", label: "LEAVE MANAGER" },
-  { to: "/admin/reports", label: "REPORTS" },
+  { to: "/admin/reports", label: "REPORTS AUDIT" },
+  { to: "/admin/productivity", label: "PRODUCTIVITY" },
   { to: "/admin/announcements", label: "ANNOUNCEMENTS" },
   { to: "/admin/payslips", label: "PAYSLIPS" },
   { to: "/admin/tasks", label: "TASK UPDATES" },
+];
+
+const superAdminNav = [
+  { to: "/admin/system-admins", label: "SYSTEM ADMINS" },
 ];
 
 const userNav = [
@@ -23,16 +31,29 @@ const userNav = [
   { to: "/user/timesheets", label: "TIME SHEET" },
   { to: "/user/leaves", label: "MANAGE LEAVES" },
   { to: "/user/tasks", label: "TASK UPDATES" },
+  { to: "/user/reports", label: "MY REPORTS" },
+  { to: "/user/calendar", label: "MY CALENDAR" },
   { to: "/user/payslips", label: "PAYSLIPS" },
   { to: "/user/announcements", label: "ANNOUNCEMENTS" },
 ];
 
 export function AppShell({ role, children }: { role: "admin" | "user"; children: ReactNode }) {
-  const { userName, logout } = useAuth();
+  const { role: authRole, userName, logout, onboardingStatus } = useAuth();
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const nav = role === "admin" ? adminNav : userNav;
+  const nav = role === "admin" ? (authRole === "super_admin" ? [...adminNav, ...superAdminNav] : adminNav) : userNav;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Route lock: if resource user has pending onboarding, force them to profile
+  const isOnboardingLocked = role === "user" && onboardingStatus === "pending";
+
+  useEffect(() => {
+    if (isOnboardingLocked && pathname !== "/user/profile") {
+      toast("Please complete your profile before accessing other sections.", { icon: "🔒" });
+      router.navigate({ to: "/user/profile" });
+    }
+  }, [isOnboardingLocked, pathname]);
 
   const handleLogout = () => {
     logout();
@@ -77,6 +98,17 @@ export function AppShell({ role, children }: { role: "admin" | "user"; children:
                 <button onClick={handleLogout} className="text-[#2a8f8f] hover:underline">
                   Logout
                 </button>
+                {role === "user" && (
+                  <>
+                    <span className="mx-1 text-slate-500 font-medium">|</span>
+                    <button
+                      onClick={() => setIsReportModalOpen(true)}
+                      className="text-amber-600 font-extrabold hover:underline"
+                    >
+                      Log Daily Work
+                    </button>
+                  </>
+                )}
               </div>
               <div className="text-2xl font-semibold text-slate-700">Resource Management</div>
             </div>
@@ -98,18 +130,33 @@ export function AppShell({ role, children }: { role: "admin" | "user"; children:
       {/* ── Desktop nav strip (horizontal scroll on medium screens) ── */}
       <nav className="bg-[#2f8f8f] border-t border-b border-[#247373] hidden sm:block">
         <div className="max-w-[1100px] mx-auto px-4 overflow-x-auto scrollbar-none">
-          <div className="flex min-w-max flex-wrap">
-            {nav.map((n) => (
-              <Link
-                key={n.to}
-                to={n.to}
-                className={`px-3 py-2.5 text-[11px] font-semibold tracking-wider uppercase whitespace-nowrap ${
-                  isActive(n) ? "bg-slate-700 text-white" : "text-white/95 hover:bg-[#247373]"
-                }`}
-              >
-                {n.label}
-              </Link>
-            ))}
+          <div className="flex min-w-max flex-nowrap">
+            {nav.map((n) => {
+              const locked = isOnboardingLocked && n.to !== "/user/profile";
+              return (
+                <Link
+                  key={n.to}
+                  to={locked ? "/user/profile" : n.to}
+                  onClick={(e) => {
+                    if (locked) {
+                      e.preventDefault();
+                      toast("Complete your profile to unlock this section.", { icon: "🔒" });
+                      router.navigate({ to: "/user/profile" });
+                    }
+                  }}
+                  className={`px-3 py-2.5 text-[11px] font-semibold tracking-wider uppercase whitespace-nowrap flex items-center gap-1 ${
+                    locked
+                      ? "text-white/40 cursor-not-allowed"
+                      : isActive(n)
+                        ? "bg-slate-700 text-white"
+                        : "text-white/95 hover:bg-[#247373]"
+                  }`}
+                >
+                  {locked && <Lock className="w-3 h-3" />}
+                  {n.label}
+                </Link>
+              );
+            })}
             <button
               onClick={handleLogout}
               className="px-3 py-2.5 text-[11px] font-semibold tracking-wider uppercase text-white/95 hover:bg-[#247373] whitespace-nowrap"
@@ -168,6 +215,7 @@ export function AppShell({ role, children }: { role: "admin" | "user"; children:
       <footer className="bg-[#2f8f8f] text-white text-center text-xs py-4">
         © 2026 All rights reserved MAGNIFIC IT
       </footer>
+      <DailyReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
     </div>
   );
 }

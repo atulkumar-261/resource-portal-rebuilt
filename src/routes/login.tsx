@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth, useRMS } from "@/lib/store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -19,19 +20,62 @@ function LoginPage() {
   const router = useRouter();
   const login = useAuth((s) => s.login);
   const resources = useRMS((s) => s.resources);
-  const [email, setEmail] = useState("admin@magnificit.co.uk");
-  const [password, setPassword] = useState("admin123");
-  const [role, setRole] = useState<"admin" | "user">("admin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === "admin") {
-      login("admin", "Admin");
-      router.navigate({ to: "/admin" });
-    } else {
-      const r = resources[0];
-      login("user", r.fullName, r.id);
-      router.navigate({ to: "/user" });
+    setLoading(true);
+    try {
+      const backendHost = window.location.hostname;
+      const resp = await fetch(`http://${backendHost}:8000/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: email,
+          password: password,
+        }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const userObj = data.user;
+        const userRole = userObj.role === "super_admin" ? "super_admin" : userObj.role === "admin" ? "admin" : "user";
+        
+        let displayName = userObj.full_name || userObj.username;
+        if (data.resource_id) {
+          const resObj = resources.find((r) => r.id === data.resource_id);
+          if (resObj) {
+            displayName = resObj.fullName;
+          }
+        } else if ((userRole === "admin" || userRole === "super_admin") && !userObj.full_name) {
+          displayName = "Admin";
+        }
+        
+        login(userRole, displayName, data.resource_id || undefined, data.token, data.onboarding_status || undefined);
+        toast.success(`Welcome back, ${displayName}!`);
+        
+        if (userRole === "admin" || userRole === "super_admin") {
+          router.navigate({ to: "/admin" });
+        } else if (data.onboarding_status === "pending") {
+          toast("Please complete your profile to continue.", { icon: "⚠️" });
+          router.navigate({ to: "/user/profile" });
+        } else {
+          router.navigate({ to: "/user" });
+        }
+      } else {
+        const errJson = await resp.json().catch(() => ({}));
+        const msg = errJson.detail || "Invalid credentials.";
+        toast.error(msg);
+      }
+    } catch (err) {
+      console.error("Login failed:", err);
+      toast.error("Could not connect to the backend server. Please verify it is running.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,8 +103,8 @@ function LoginPage() {
           <p className="text-sm text-slate-500 mb-6">Enter your credentials to continue</p>
           <form onSubmit={submit} className="space-y-4">
             <div>
-              <Label>Email</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label>Login ID</Label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. rahul.sharma@magnificit.com" required />
             </div>
             <div>
               <Label>Password</Label>
@@ -71,28 +115,11 @@ function LoginPage() {
                 required
               />
             </div>
-            <div>
-              <Label>Role</Label>
-              <div className="flex gap-4 mt-1.5">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="radio"
-                    checked={role === "admin"}
-                    onChange={() => setRole("admin")}
-                  />{" "}
-                  Admin
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" checked={role === "user"} onChange={() => setRole("user")} />{" "}
-                  Resource
-                </label>
-              </div>
-            </div>
-            <Button type="submit" className="w-full">
-              Login
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
             </Button>
             <p className="text-xs text-slate-500 text-center">
-              Demo: pick Admin or Resource and sign in.
+              Enter your registered Login ID and password to sign in.
             </p>
           </form>
         </div>

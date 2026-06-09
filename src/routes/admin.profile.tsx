@@ -12,10 +12,6 @@ export const Route = createFileRoute("/admin/profile")({
           <Label>Full Name</Label>
           <Input defaultValue="Admin" />
         </div>
-        <div>
-          <Label>Email</Label>
-          <Input defaultValue="admin@magnificit.co.uk" />
-        </div>
       </div>
       <h2 className="font-semibold text-slate-800 mt-6 mb-2">Change Password</h2>
       <div className="grid md:grid-cols-3 gap-4 max-w-3xl">

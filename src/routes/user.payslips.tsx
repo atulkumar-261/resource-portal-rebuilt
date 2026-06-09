@@ -8,7 +8,8 @@ export const Route = createFileRoute("/user/payslips")({
 
 function UserPayslipsPage() {
   const resourceId = useAuth((s) => s.resourceId) ?? "177";
-  const list = useRMS((s) => s.payslips.filter((p) => p.resourceId === resourceId));
+  const allPayslips = useRMS((s) => s.payslips);
+  const list = allPayslips.filter((p) => p.resourceId === resourceId);
   return (
     <PageCard title="Pay Slips List">
       <table className="w-full text-sm border border-slate-200">

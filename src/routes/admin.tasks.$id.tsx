@@ -21,7 +21,9 @@ function ViewTask() {
   const [resourceName, setResourceName] = useState("");
   const [project, setProject] = useState("");
   const [notes, setNotes] = useState("");
-  const [status, setStatus] = useState<"pending" | "in-progress" | "completed">("pending");
+  const [status, setStatus] = useState<
+    "pending" | "in-progress" | "completed" | "wanting-requirements"
+  >("pending");
 
   useEffect(() => {
     if (task) {
@@ -159,6 +161,7 @@ function ViewTask() {
             <option value="pending">Pending</option>
             <option value="in-progress">In Progress</option>
             <option value="completed">Completed</option>
+            <option value="wanting-requirements">Wanting Requirements</option>
           </select>
         </div>
 

@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAuth, useRMS } from "@/lib/store";
 
 export const Route = createFileRoute('/user/leaves/')({
@@ -10,7 +9,19 @@ export const Route = createFileRoute('/user/leaves/')({
 
 function UserLeavesPage() {
   const resourceId = useAuth((s) => s.resourceId) ?? "177";
-  const leaves = useRMS((s) => s.leaves.filter((l) => l.resourceId === resourceId));
+  const allLeaves = useRMS((s) => s.leaves);
+  
+  // Sort leaves descending so newest ID (largest suffix) is at the top
+  const leaves = allLeaves
+    .filter((l) => l.resourceId === resourceId)
+    .sort((a, b) => b.id.localeCompare(a.id));
+
+  const getDisplayId = (id: string, index: number, total: number) => {
+    const match = id.match(/^l(\d+)$/);
+    if (match) return match[1];
+    return String(total - index);
+  };
+
   return (
     <PageCard
       title="Manage Leaves"
@@ -40,41 +51,58 @@ function UserLeavesPage() {
           </div>
         ))}
       </div>
-      <table className="w-full text-sm border border-slate-200">
-        <thead className="bg-slate-100">
-          <tr>
-            <th className="text-left px-3 py-2">From</th>
-            <th className="text-left px-3 py-2">To</th>
-            <th className="text-left px-3 py-2">Days</th>
-            <th className="text-left px-3 py-2">Type</th>
-            <th className="text-left px-3 py-2">Reason</th>
-            <th className="text-left px-3 py-2">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {leaves.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-3 py-4 text-center text-slate-500">
-                No leaves applied
-              </td>
+      <div className="border border-slate-200 rounded overflow-hidden">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-[#7a7672] text-white font-medium text-center">
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">Leave Id #</th>
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">Start Date</th>
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">End Date</th>
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">No of Days</th>
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">Leave Type</th>
+              <th className="text-left px-3 py-2 border-r border-slate-300/30">Reason</th>
+              <th className="text-left px-3 py-2">Status</th>
             </tr>
-          )}
-          {leaves.map((l) => (
-            <tr key={l.id} className="border-t border-slate-100">
-              <td className="px-3 py-2">{l.fromDate}</td>
-              <td className="px-3 py-2">{l.toDate}</td>
-              <td className="px-3 py-2">{l.totalDays}</td>
-              <td className="px-3 py-2">{l.type}</td>
-              <td className="px-3 py-2">{l.reason}</td>
-              <td className="px-3 py-2">
-                <Badge variant="secondary" className="capitalize">
-                  {l.status}
-                </Badge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {leaves.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                  No leaves applied
+                </td>
+              </tr>
+            )}
+            {leaves.map((l, index) => (
+              <tr key={l.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                <td className="px-3 py-2.5 border-r border-slate-200 font-medium">
+                  {getDisplayId(l.id, index, leaves.length)}
+                </td>
+                <td className="px-3 py-2.5 border-r border-slate-200">{l.fromDate}</td>
+                <td className="px-3 py-2.5 border-r border-slate-200">{l.toDate}</td>
+                <td className="px-3 py-2.5 border-r border-slate-200 font-medium">{l.totalDays}</td>
+                <td className="px-3 py-2.5 border-r border-slate-200">{l.type} Leave</td>
+                <td className="px-3 py-2.5 border-r border-slate-200 max-w-xs truncate" title={l.reason}>
+                  {l.reason}
+                </td>
+                <td className="px-3 py-2.5">
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                    l.status === 'approved' 
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                      : l.status === 'rejected' 
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200' 
+                        : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    {l.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-slate-500 mt-3">
+        1 to {leaves.length} of {leaves.length}
+      </p>
     </PageCard>
   );
 }
