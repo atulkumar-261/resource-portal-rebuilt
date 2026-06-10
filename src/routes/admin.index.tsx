@@ -47,27 +47,16 @@ function AdminDashboard() {
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  // 3. Address Change Log (Mocked history linked to actual resource profiles)
-  const addressChanges = [
-    {
-      resourceId: "179",
-      resourceName: "Jimy Shine",
-      currentAddress: "28 Pipistrelle Place, Littleover, Derby UK, DE23 4DA",
-      oldAddress: "5 Oak Lane, Birmingham, B1 1AA",
-    },
-    {
-      resourceId: "177",
-      resourceName: "Asra Ghafoor",
-      currentAddress: "09, Park View, Dewsbury, West Yorkshire, WF12 9DT",
-      oldAddress: "12 Valley Road, Dewsbury, WF12 9XX",
-    },
-    {
-      resourceId: "181",
-      resourceName: "Gouthami Masam",
-      currentAddress: "21 Duett Court St Giles Close, Hounslow TW5 0AF",
-      oldAddress: "21 Elm Street, Leeds, LS1 4AB",
-    },
-  ];
+  // 3. Address Change Log (Derived from actual backend resources)
+  const addressChanges = resources
+    .filter((r) => r.address)
+    .slice(0, 5)
+    .map((r) => ({
+      resourceId: r.id,
+      resourceName: r.fullName,
+      currentAddress: r.address,
+      oldAddress: "—", // No historical tracking in database
+    }));
 
   // 4. Sidebar: Active Resources (searchable)
   const activeResources = resources.filter((r) => r.status === "active");
