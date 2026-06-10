@@ -76,10 +76,29 @@ You can now log in using the default Super Admin credentials created during Step
 ## 🌟 What's Included in this System?
 
 Once you are logged in, you will have access to:
-- **Resource Lifecycle & Onboarding:** Create resources, auto-generate their credentials, and track their profile completion. Resources must upload documents (CV, Passport) and reach 80% completion before admins can approve them.
-- **Admin Dashboards:** View real-time widgets showing resources pending onboarding, resources awaiting admin approval, and highly overutilized resources.
-- **Project & Task Management:** Create projects, track specific requirements, assign resources, and utilize daily timesheets.
-- **AI Task Intelligence:** Features a daily task scheduler and workload balancing engine to ensure no resource is assigned >90% of their weekly capacity.
+- **Resource Lifecycle & Onboarding Dashboard:** Admins can create resources, automatically generate credentials, and monitor profile completion.
+- **Profile Completion & Onboarding Guard:**
+  - Standard resources have their main sidebar locked (🔓) with locked icons on all sections (Dashboard, Timesheets, Leaves, Tasks, Reports, Calendar, Payslips, Announcements) until their **Profile Completion reaches at least 80%** or their onboarding status is approved by an Admin.
+  - To prevent layout clutter and security issues, standard users cannot upload documents (CV, Passport, Visa) directly from their profiles. Instead, these documents are uploaded and managed by Admins. Standard users must fill out their basic, address, emergency contact, bank, and skillset details to hit the 80% completion requirement.
+- **Strict Contact Number Validation:** Enforces country code selection (e.g. `+` + up to 4 digits) and exactly 10 digits for local numbers. Restricts any non-numeric entries (except the `+` prefix) and checks validation on submission to avoid database format contamination.
+- **Admin & Super Admin Controls:** Manage clients, projects, system admins, resource assignments, workload heatmaps, leave requests, and payslips.
+- **Project & Task Management:** Create projects, define functional requirements, assign resources, and utilize automated daily timesheets.
+- **AI Task Intelligence:** Includes an AI-powered daily task scheduler and workload balancing engine to ensure no resource is assigned more than 90% of their weekly capacity.
+
+## 🔒 Security Hardening & Production-Ready Architecture
+
+The system has been fully audited and secured under production-grade standards:
+- **Database Session Isolation:** Offloads heavy background processing (like AI report analysis and notification alerts) to localized sessions using context managers, preventing request-scoped connection pools from dying.
+- **Audit Logging Savepoint Isolation:** All audit writes utilize savepoint nesting (`db.begin_nested()`). This ensures any audit logging write failure is rolled back locally and does not contaminate or rollback primary business transactions.
+- **Project Assignment Enforcement:** Standard resource users are blocked from viewing unassigned projects or task details (preventing IDOR leaks). Resource requests are verified against `ProjectAssignment` records and return `403 Access Denied` on validation failure.
+- **File Upload Security Framework:** Centralized validation (`file_security.py`) enforces:
+  - 10MB file size limit.
+  - Strict format extension whitelist (`.pdf`, `.doc`, `.docx`, `.png`, `.jpg`, `.jpeg`, `.xlsx`, `.xls`).
+  - MIME-type verification and filename sanitization.
+  - Path traversal checks to prevent directory escaping.
+  - Immediate cleanup (unlinking) of saved files if nested database writes fail.
+- **Transaction Safety & Rollbacks:** All critical database writes across admin routes, projects, and tasks are wrapped in robust try/except blocks that trigger `db.rollback()` on error to maintain absolute database integrity.
+- **Query Optimization:** Implemented eager relation loading (`joinedload` and `selectinload`) on timesheet and report list endpoints to eliminate performance bottlenecks caused by N+1 queries.
 
 ## 📁 Project Architecture Map
 
@@ -88,15 +107,16 @@ If you want to explore the code, here is where everything lives:
 MagnificIT/resource-portal-rebuilt/
 ├── backend/                  # Python FastAPI Backend
 │   ├── app/
-│   │   ├── api/              # API Route Handlers (auth, resources, tasks)
-│   │   ├── models/           # SQLAlchemy DB Schemas
-│   │   └── services/         # Business logic and AI services
+│   │   ├── api/              # API Route Handlers (auth, resources, tasks, org_structure)
+│   │   ├── core/             # Security configs, JWT handlers, and file_security.py
+│   │   ├── models/           # SQLAlchemy DB Models
+│   │   └── services/         # Business logic, progress calculation, and AI services
 │   ├── main.py               # Backend entry point
 │   └── setup_db.py           # Database seeder script
 ├── src/                      # React Frontend
-│   ├── components/           # Reusable UI components (shadcn/ui)
+│   ├── components/           # Reusable UI components & layouts (AppShell)
 │   ├── lib/                  # Global Store (Zustand) & API fetchers
-│   └── routes/               # TanStack File-Based Routes
+│   └── routes/               # TanStack File-Based Routes (user.profile.tsx, admin.*)
 ├── vite.config.ts            # Vite Configuration
 └── package.json              # Frontend NPM Dependencies
 ```
