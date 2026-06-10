@@ -4,9 +4,34 @@ import { useState, useEffect } from "react";
 import { X, AlertTriangle, CheckCircle, Loader2, UploadCloud } from "lucide-react";
 import { fetchSelfProfileCompletion, updateSelfProfile, changePassword, uploadResourceDocument, fetchResourceDocuments, deleteResourceDocument, type ProfileCompletionResponse, type ResourceDocument } from "@/lib/api/resources";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/user/profile")({ component: MyProfile });
+
+function parsePhoneNumber(fullPhone: string) {
+  const clean = (fullPhone || "").trim();
+  const match = clean.match(/^(\+\d{1,4})\s*(\d{10})$/);
+  if (match) {
+    return { countryCode: match[1], localNumber: match[2] };
+  }
+  if (clean.startsWith("+")) {
+    const spaceIndex = clean.indexOf(" ");
+    if (spaceIndex > 0) {
+      return {
+        countryCode: clean.slice(0, spaceIndex),
+        localNumber: clean.slice(spaceIndex + 1).replace(/\D/g, "").slice(0, 10)
+      };
+    }
+    const digits = clean.replace(/\D/g, "");
+    if (digits.length > 10) {
+      return {
+        countryCode: "+" + digits.slice(0, digits.length - 10),
+        localNumber: digits.slice(digits.length - 10)
+      };
+    }
+  }
+  return { countryCode: "+91", localNumber: clean.replace(/\D/g, "").slice(0, 10) };
+}
 
 function MyProfile() {
   const resourceId = useAuth((s) => s.resourceId);
@@ -59,6 +84,41 @@ function MyProfile() {
       });
   }, []);
 
+  useEffect(() => {
+    if (resource) {
+      setFullName(resource.fullName || "");
+      setJobTitle(resource.jobTitle || "");
+      setEmail(resource.email || "");
+      setNotes(resource.performanceNotes || "");
+      setSkillset(resource.skillset || "");
+      setOtherInfo(resource.otherInfo || "");
+      setBankAccount(resource.bankAccount || "");
+      setSortCode(resource.sortCode || "");
+      setBankName(resource.bankName || "");
+      setDob(resource.dob || "");
+      setPassportNumber(resource.passportNumber || "");
+      setPassportExpiry(resource.passportExpiry || "");
+      setVisaNumber(resource.visaNumber || "");
+      setVisaExpiry(resource.visaExpiry || "");
+      setNiNumber(resource.niNumber || "");
+      setCitizenOf(resource.citizenOf || "");
+      
+      const parsedPhone = parsePhoneNumber(resource.phone || "");
+      setPhoneCode(parsedPhone.countryCode);
+      setPhoneNum(parsedPhone.localNumber);
+      
+      setAddress(resource.address || "");
+      setEmergencyName(resource.emergencyName || "");
+      
+      const parsedEmergency = parsePhoneNumber(resource.emergencyPhone || "");
+      setEmergencyPhoneCode(parsedEmergency.countryCode);
+      setEmergencyPhoneNum(parsedEmergency.localNumber);
+      
+      setEmergencyEmail(resource.emergencyEmail || "");
+      setEmergencyAddress(resource.emergencyAddress || "");
+    }
+  }, [resource]);
+
   // Form states matching fields
   const [fullName, setFullName] = useState(resource?.fullName || "");
   const [jobTitle, setJobTitle] = useState(resource?.jobTitle || "");
@@ -80,12 +140,14 @@ function MyProfile() {
   const [visaExpiry, setVisaExpiry] = useState(resource?.visaExpiry || "");
   const [niNumber, setNiNumber] = useState(resource?.niNumber || "");
   const [citizenOf, setCitizenOf] = useState(resource?.citizenOf || "");
-  const [phone, setPhone] = useState(resource?.phone || "");
+  const [phoneCode, setPhoneCode] = useState("+91");
+  const [phoneNum, setPhoneNum] = useState("");
   const [address, setAddress] = useState(resource?.address || "");
 
   // Emergency Contact Details states
   const [emergencyName, setEmergencyName] = useState(resource?.emergencyName || "");
-  const [emergencyPhone, setEmergencyPhone] = useState(resource?.emergencyPhone || "");
+  const [emergencyPhoneCode, setEmergencyPhoneCode] = useState("+91");
+  const [emergencyPhoneNum, setEmergencyPhoneNum] = useState("");
   const [emergencyEmail, setEmergencyEmail] = useState(resource?.emergencyEmail || "");
   const [emergencyAddress, setEmergencyAddress] = useState(resource?.emergencyAddress || "");
 
@@ -95,21 +157,21 @@ function MyProfile() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordStatus, setPasswordStatus] = useState<string | null>(null);
 
+  // File name states for UI display
+  const [avatarFileName, setAvatarFileName] = useState("");
+
   // File Upload Helper
   const handleFileUpload = (fieldName: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (fieldName === "avatarUrl") {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result === "string") {
-            update(resource.id, { avatarUrl: reader.result });
-          }
-        };
-        reader.readAsDataURL(file);
-      } else {
-        update(resource.id, { [fieldName]: file.name });
-      }
+    if (file && fieldName === "avatarUrl") {
+      setAvatarFileName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === "string") {
+          update(resource.id, { avatarUrl: reader.result });
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -118,10 +180,22 @@ function MyProfile() {
   // Form Submit Handler — calls backend API, falls back to mock store
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (phoneNum && phoneNum.length !== 10) {
+      toast.error("Contact Phone must be exactly 10 digits.");
+      return;
+    }
+    if (emergencyPhoneNum && emergencyPhoneNum.length !== 10) {
+      toast.error("Emergency Contact Phone must be exactly 10 digits.");
+      return;
+    }
+
+    const fullPhone = phoneNum ? `${phoneCode} ${phoneNum}`.trim() : "";
+    const fullEmergencyPhone = emergencyPhoneNum ? `${emergencyPhoneCode} ${emergencyPhoneNum}`.trim() : "";
+
     setSaving(true);
     try {
       const result = await updateSelfProfile({
-        phone: phone || undefined,
+        phone: fullPhone || undefined,
         dob: dob || undefined,
         ni_number: niNumber || undefined,
         nationality: citizenOf || undefined,
@@ -133,7 +207,7 @@ function MyProfile() {
         other_info: otherInfo || undefined,
         current_address: address || undefined,
         emergency_contact_name: emergencyName || undefined,
-        emergency_contact_phone: emergencyPhone || undefined,
+        emergency_contact_phone: fullEmergencyPhone || undefined,
         emergency_contact_email: emergencyEmail || undefined,
         emergency_contact_address: emergencyAddress || undefined,
         bank_name: bankName || undefined,
@@ -157,8 +231,8 @@ function MyProfile() {
       update(resource.id, {
         fullName, jobTitle, email, performanceNotes: notes, skillset, otherInfo,
         bankAccount, sortCode, bankName, dob, passportNumber, passportExpiry,
-        visaNumber, visaExpiry, niNumber, citizenOf, phone, address,
-        emergencyName, emergencyPhone, emergencyEmail, emergencyAddress,
+        visaNumber, visaExpiry, niNumber, citizenOf, phone: fullPhone, address,
+        emergencyName, emergencyPhone: fullEmergencyPhone, emergencyEmail, emergencyAddress,
       });
       toast.success("Profile saved locally (backend unavailable).");
     } finally {
@@ -261,8 +335,8 @@ function MyProfile() {
               <input
                 type="text"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+                disabled
+                className="flex-grow bg-slate-200 text-slate-700 px-2 py-1 border border-slate-400 rounded-none text-xs focus:outline-none h-7 cursor-not-allowed"
               />
             </div>
 
@@ -271,8 +345,8 @@ function MyProfile() {
               <input
                 type="text"
                 value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+                disabled
+                className="flex-grow bg-slate-200 text-slate-700 px-2 py-1 border border-slate-400 rounded-none text-xs focus:outline-none h-7 cursor-not-allowed"
               />
             </div>
 
@@ -281,8 +355,8 @@ function MyProfile() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+                disabled
+                className="flex-grow bg-slate-200 text-slate-700 px-2 py-1 border border-slate-400 rounded-none text-xs focus:outline-none h-7 cursor-not-allowed"
               />
             </div>
 
@@ -290,8 +364,8 @@ function MyProfile() {
               <label className="w-36 font-normal text-slate-100 shrink-0 pt-1">Notes:</label>
               <textarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none min-h-[50px] resize-y"
+                disabled
+                className="flex-grow bg-slate-200 text-slate-700 px-2 py-1 border border-slate-400 rounded-none text-xs focus:outline-none min-h-[50px] resize-y cursor-not-allowed"
               />
             </div>
 
@@ -304,108 +378,6 @@ function MyProfile() {
               />
             </div>
 
-            {/* Upload Profile Picture */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Profile Picture:</span>
-                <span className="text-[9px] text-slate-300">Supports JPG, PNG, GIF</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload Profile Picture
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleFileUpload("avatarUrl", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Upload CV */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Upload CV:</span>
-                <span className="text-[9px] text-slate-300">Supports PDF, doc, docx</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload CV
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => handleFileUpload("cvName", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Passport Copy */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Passport Copy:</span>
-                <span className="text-[9px] text-slate-300">Supports PDF, DOC, DOCX, JPG, PNG, GIF</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload Passport
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,image/*"
-                  onChange={(e) => handleFileUpload("passportCopyName", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Visa Copy */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Visa Copy:</span>
-                <span className="text-[9px] text-slate-300">Supports PDF, DOC, DOCX, JPG, PNG, GIF</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload Visa
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,image/*"
-                  onChange={(e) => handleFileUpload("visaCopyName", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Holiday Sheet */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Holiday Sheet:</span>
-                <span className="text-[9px] text-slate-300">Supports PDF, xls, xlsx</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload Holiday Sheet
-                <input
-                  type="file"
-                  accept=".pdf,.xls,.xlsx"
-                  onChange={(e) => handleFileUpload("holidaySheetName", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Other Documents */}
-            <div className="flex items-center">
-              <div className="w-36 flex flex-col shrink-0">
-                <span className="font-normal text-slate-100">Other/Academic Certificates:</span>
-                <span className="text-[9px] text-slate-300">Supports PDF, doc, docx, xls, xlsx</span>
-              </div>
-              <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors">
-                Upload Other documents
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx"
-                  onChange={(e) => handleFileUpload("otherDocsName", e)}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
             <div className="flex items-start">
               <label className="w-36 font-normal text-slate-100 shrink-0 pt-1">Other Info:</label>
               <textarea
@@ -414,6 +386,30 @@ function MyProfile() {
                 className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none min-h-[50px] resize-y"
               />
             </div>
+
+            {/* Upload Profile Picture */}
+            <div className="flex items-center">
+              <div className="w-36 flex flex-col shrink-0">
+                <span className="font-normal text-slate-100">Profile Picture:</span>
+                <span className="text-[9px] text-slate-300">Supports JPG, PNG, GIF</span>
+              </div>
+              <div className="flex items-center gap-2 flex-grow overflow-hidden">
+                <label className="bg-white hover:bg-slate-100 text-black px-3 py-1 border border-black rounded-none text-[11px] font-semibold cursor-pointer transition-colors shrink-0">
+                  Upload Profile Picture
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload("avatarUrl", e)}
+                    className="hidden"
+                  />
+                </label>
+                {(avatarFileName || (resource?.avatarUrl && !resource.avatarUrl.startsWith("data:"))) && (
+                  <span className="text-[11px] text-slate-300 truncate font-mono max-w-[200px]" title={avatarFileName || resource?.avatarUrl?.split("/").pop()}>
+                    {avatarFileName || resource?.avatarUrl?.split("/").pop()}
+                  </span>
+                )}
+              </div>
+             </div>
           </div>
 
           {/* Column 2: Document previews / statuses (lg:col-span-4) */}
@@ -449,59 +445,6 @@ function MyProfile() {
 
             <div className="font-bold text-slate-100 block pt-1 border-b border-slate-600 pb-2 mb-4">
               Employee ID: {resource?.employeeId || "—"}
-            </div>
-
-            {/* Document Upload Fields */}
-            <div className="space-y-4">
-              {[
-                { type: "cv", label: "Current CV" },
-                { type: "passport_copy", label: "Passport Copy" },
-                { type: "visa_copy", label: "Visa Copy" },
-                { type: "holiday_sheet", label: "Holiday Sheet" },
-                { type: "other_docs", label: "Other/Academic Certificates" }
-              ].map(docType => {
-                const existingDoc = documents.find(d => d.document_type === docType.type);
-                const isUploading = uploadMutation.isPending && uploadMutation.variables?.type === docType.type;
-                return (
-                  <div key={docType.type} className="space-y-1">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-semibold text-slate-100 text-xs">{docType.label}:</span>
-                      {existingDoc ? (
-                        <div className="flex items-center gap-1 bg-[#505050] px-1.5 py-0.5 rounded-sm flex-1 min-w-0 justify-between">
-                          <span className="text-slate-100 text-[10px] font-mono truncate" title={existingDoc.file_name}>
-                            {existingDoc.file_name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => deleteDocMutation.mutate(existingDoc.id)}
-                            disabled={deleteDocMutation.isPending}
-                            className="text-red-400 hover:text-red-500 disabled:opacity-50 shrink-0"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 flex-1 justify-end">
-                          <span className="text-red-400 italic font-mono text-[10px]">Not uploaded</span>
-                          <label className={`cursor-pointer bg-teal-700 hover:bg-teal-600 text-white px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
-                            {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <UploadCloud className="w-3 h-3" />}
-                            Upload
-                            <input
-                              type="file"
-                              className="hidden"
-                              onChange={(e) => {
-                                if (e.target.files?.[0]) {
-                                  uploadMutation.mutate({ type: docType.type, file: e.target.files[0] });
-                                }
-                              }}
-                            />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
 
@@ -622,15 +565,12 @@ function MyProfile() {
           <div className="grid md:grid-cols-2 gap-6 text-xs">
             <div className="flex items-center">
               <label className="w-36 font-normal text-slate-100 shrink-0">Date Of Birth:</label>
-              <div className="flex-grow flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-300">(DD-MM-YYYY)</span>
-                <input
-                  type="text"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="w-full bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
-                />
-              </div>
+              <input
+                type="date"
+                value={dob}
+                onChange={(e) => setDob(e.target.value)}
+                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+              />
             </div>
 
             <div className="flex items-center">
@@ -645,15 +585,12 @@ function MyProfile() {
 
             <div className="flex items-center">
               <label className="w-36 font-normal text-slate-100 shrink-0">Passport Expiry Date:</label>
-              <div className="flex-grow flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-300">(DD-MM-YYYY)</span>
-                <input
-                  type="text"
-                  value={passportExpiry}
-                  onChange={(e) => setPassportExpiry(e.target.value)}
-                  className="w-full bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
-                />
-              </div>
+              <input
+                type="date"
+                value={passportExpiry}
+                onChange={(e) => setPassportExpiry(e.target.value)}
+                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+              />
             </div>
 
             <div className="flex items-center">
@@ -668,15 +605,12 @@ function MyProfile() {
 
             <div className="flex items-center">
               <label className="w-36 font-normal text-slate-100 shrink-0">Visa Expiry Date:</label>
-              <div className="flex-grow flex flex-col gap-0.5">
-                <span className="text-[9px] text-slate-300">(DD-MM-YYYY)</span>
-                <input
-                  type="text"
-                  value={visaExpiry}
-                  onChange={(e) => setVisaExpiry(e.target.value)}
-                  className="w-full bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
-                />
-              </div>
+              <input
+                type="date"
+                value={visaExpiry}
+                onChange={(e) => setVisaExpiry(e.target.value)}
+                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+              />
             </div>
 
             <div className="flex items-center">
@@ -701,12 +635,30 @@ function MyProfile() {
 
             <div className="flex items-center">
               <label className="w-36 font-normal text-slate-100 shrink-0">Contact Phone:</label>
-              <input
-                type="text"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
-              />
+              <div className="flex-grow flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={phoneCode}
+                  placeholder="+91"
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val && !val.startsWith("+")) val = "+" + val;
+                    val = val.replace(/[^\d+]/g, "").slice(0, 5);
+                    setPhoneCode(val);
+                  }}
+                  className="w-16 bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7 text-center font-semibold"
+                />
+                <input
+                  type="text"
+                  value={phoneNum}
+                  placeholder="10-digit number"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setPhoneNum(val);
+                  }}
+                  className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+                />
+              </div>
             </div>
 
             <div className="flex items-start md:col-span-2">
@@ -740,12 +692,30 @@ function MyProfile() {
 
             <div className="flex items-center">
               <label className="w-36 font-normal text-slate-100 shrink-0">Contact Phone:</label>
-              <input
-                type="text"
-                value={emergencyPhone}
-                onChange={(e) => setEmergencyPhone(e.target.value)}
-                className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
-              />
+              <div className="flex-grow flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={emergencyPhoneCode}
+                  placeholder="+91"
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val && !val.startsWith("+")) val = "+" + val;
+                    val = val.replace(/[^\d+]/g, "").slice(0, 5);
+                    setEmergencyPhoneCode(val);
+                  }}
+                  className="w-16 bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7 text-center font-semibold"
+                />
+                <input
+                  type="text"
+                  value={emergencyPhoneNum}
+                  placeholder="10-digit number"
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setEmergencyPhoneNum(val);
+                  }}
+                  className="flex-grow bg-white text-black px-2 py-1 border border-black rounded-none text-xs focus:outline-none h-7"
+                />
+              </div>
             </div>
 
             <div className="flex items-center">

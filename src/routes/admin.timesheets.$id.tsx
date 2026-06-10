@@ -91,14 +91,18 @@ function AdminTimesheetDetail() {
     setDailyHours((prev) => prev.map((h, i) => (i === index ? num : h)));
   };
 
-  const handleSave = () => {
-    updateTimesheet(ts.id, {
-      status,
-      projectName,
-      dailyHours,
-      totalHours: calculatedTotal,
-    });
-    router.navigate({ to: "/admin/timesheets" });
+  const handleSave = async () => {
+    try {
+      await updateTimesheet(ts.id, {
+        status,
+        projectName,
+        dailyHours,
+        totalHours: calculatedTotal,
+      });
+      router.navigate({ to: "/admin/timesheets" });
+    } catch (e) {
+      // Error toast is handled by store action
+    }
   };
 
   return (

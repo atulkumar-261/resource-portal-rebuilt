@@ -78,6 +78,7 @@ class Department(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False, unique=True)
     description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
 
 
 class Designation(Base):
@@ -85,6 +86,8 @@ class Designation(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     title = Column(String(100), nullable=False, unique=True)
     description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+
 
 
 class SkillMaster(Base):
@@ -278,6 +281,8 @@ class DocumentAttachment(Base):
     file_size = Column(Integer, nullable=False)
     mime_type = Column(String(100), nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 
 
@@ -488,6 +493,9 @@ class Payslip(Base):
     notes = Column(Text, nullable=True)
     amount = Column(Numeric(10, 2), nullable=False)
     file_attachment_id = Column(UUID(as_uuid=True), ForeignKey("document_attachments.id"), nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 
     resource = relationship("Resource", back_populates="payslips")
@@ -500,6 +508,9 @@ class Announcement(Base):
     subject = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     date = Column(Date, nullable=False)
+    is_deleted = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
 

@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from backend.app.models.database import Resource, Task, Leave, Timesheet, TimesheetEntry, Project, TaskStatus, ResourceStatus, ProjectStatus
+from backend.app.models.database import Resource, Task, Leave, Timesheet, TimesheetEntry, Project, TaskStatus, ResourceStatus, ProjectStatus, User
 from backend.app.core.config import get_db_session
+from backend.app.core.security import require_current_user
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
 @router.get("/dashboard-kpis")
-def get_dashboard_kpis(db: Session = Depends(get_db_session)):
+def get_dashboard_kpis(db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
     # 1. Total active resources count
     active_status = db.query(ResourceStatus).filter(ResourceStatus.name == "active").first()
     active_resources = db.query(Resource).filter(
@@ -38,7 +39,7 @@ def get_dashboard_kpis(db: Session = Depends(get_db_session)):
 
 
 @router.get("/task-status-distribution")
-def get_task_status_distribution(db: Session = Depends(get_db_session)):
+def get_task_status_distribution(db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
     results = db.query(
         TaskStatus.name,
         func.count(Task.id)
@@ -48,7 +49,7 @@ def get_task_status_distribution(db: Session = Depends(get_db_session)):
 
 
 @router.get("/weekly-logged-hours")
-def get_weekly_hours_trend(db: Session = Depends(get_db_session)):
+def get_weekly_hours_trend(db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
     results = db.query(
         Timesheet.week_end_date,
         func.sum(TimesheetEntry.hours)

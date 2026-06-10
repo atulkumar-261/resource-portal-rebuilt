@@ -14,9 +14,11 @@ function EditClient() {
     <ClientForm
       title="Edit Client"
       defaults={client}
-      onSubmit={(v) => {
-        updateClient(id, v);
-        router.navigate({ to: "/admin/clients" });
+      onSubmit={async (v) => {
+        try {
+          await updateClient(id, v);
+          router.navigate({ to: "/admin/clients" });
+        } catch (e) {}
       }}
     />
   );

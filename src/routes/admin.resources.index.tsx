@@ -46,12 +46,12 @@ function ResourcesPage() {
 
   const deptsQuery = useQuery({
     queryKey: ["meta-departments"],
-    queryFn: fetchDepartments,
+    queryFn: () => fetchDepartments(),
   });
 
   const desigsQuery = useQuery({
     queryKey: ["meta-designations"],
-    queryFn: fetchDesignations,
+    queryFn: () => fetchDesignations(),
   });
 
   const createMutation = useMutation({

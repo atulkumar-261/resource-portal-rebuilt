@@ -55,21 +55,25 @@ function ViewTask() {
     new Set(["Annual Leave", "Sick Leave", ...projects.map((p) => p.name)]),
   );
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     // Find matching resourceId for the chosen resourceName
     const matchedResource = resources.find((r) => r.fullName === resourceName);
     const resourceId = matchedResource ? matchedResource.id : task.resourceId;
 
-    updateTask(task.id, {
-      subject,
-      startDate,
-      resourceName,
-      resourceId,
-      project,
-      notes,
-      status,
-    });
-    router.navigate({ to: "/admin/tasks" });
+    try {
+      await updateTask(task.id, {
+        subject,
+        startDate,
+        resourceName,
+        resourceId,
+        project,
+        notes,
+        status,
+      });
+      router.navigate({ to: "/admin/tasks" });
+    } catch (e) {
+      // Error toast is handled by store action
+    }
   };
 
   return (

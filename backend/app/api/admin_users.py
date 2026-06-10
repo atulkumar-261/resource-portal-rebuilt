@@ -135,18 +135,25 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    db.add(
-        AuditLog(
-            module="user_management",
-            action=action,
-            table_name="users",
-            record_id=target.id,
-            old_value=old_value,
-            new_value=new_value,
-            changed_fields=changed_fields,
-            user_id=actor.id,
+    savepoint = db.begin_nested()
+    try:
+        db.add(
+            AuditLog(
+                module="user_management",
+                action=action,
+                table_name="users",
+                record_id=target.id,
+                old_value=old_value,
+                new_value=new_value,
+                changed_fields=changed_fields,
+                user_id=actor.id,
+            )
         )
-    )
+        db.flush()
+    except Exception:
+        savepoint.rollback()
+        import logging
+        logging.getLogger(__name__).exception("Audit log failure")
 
 
 @router.get("/users", response_model=List[AdminResponse])
@@ -191,28 +198,32 @@ def create_admin_user(
     role_record = _get_role(db, request.role)
     password_hash = hash_password(password_raw)
     
-    user = User(
-        username=username,
-        email=email,
-        full_name=request.full_name,
-        password_hash=password_hash,
-        role_id=role_record.id,
-        is_active=True,
-    )
-    db.add(user)
-    db.flush()
-    db.refresh(user)
-    
-    action = "super_admin_created" if request.role == "super_admin" else "admin_created"
-    _audit(
-        db,
-        current_user,
-        user,
-        action,
-        new_value=_snapshot(user),
-        changed_fields={"created": True},
-    )
-    db.commit()
+    try:
+        user = User(
+            username=username,
+            email=email,
+            full_name=request.full_name,
+            password_hash=password_hash,
+            role_id=role_record.id,
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+        
+        action = "super_admin_created" if request.role == "super_admin" else "admin_created"
+        _audit(
+            db,
+            current_user,
+            user,
+            action,
+            new_value=_snapshot(user),
+            changed_fields={"created": True},
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+        
     db.refresh(user)
     
     resp = _admin_response(user)
@@ -247,10 +258,15 @@ def update_admin_user(
         return _admin_response(target)
 
     target.updated_at = datetime.utcnow()
-    db.add(target)
-    db.flush()
-    _audit(db, current_user, target, "admin_updated", old_value=old, new_value=_snapshot(target), changed_fields=changed)
-    db.commit()
+    try:
+        db.add(target)
+        db.flush()
+        _audit(db, current_user, target, "admin_updated", old_value=old, new_value=_snapshot(target), changed_fields=changed)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+        
     db.refresh(target)
     return _admin_response(target)
 
@@ -272,20 +288,25 @@ def update_admin_status(
 
     target.is_active = request.is_active
     target.updated_at = datetime.utcnow()
-    db.add(target)
-    db.flush()
     
     action = "user_activated" if request.is_active else "user_deactivated"
-    _audit(
-        db,
-        current_user,
-        target,
-        action,
-        old_value=old,
-        new_value=_snapshot(target),
-        changed_fields={"is_active": {"old": old["is_active"], "new": request.is_active}},
-    )
-    db.commit()
+    try:
+        db.add(target)
+        db.flush()
+        _audit(
+            db,
+            current_user,
+            target,
+            action,
+            old_value=old,
+            new_value=_snapshot(target),
+            changed_fields={"is_active": {"old": old["is_active"], "new": request.is_active}},
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+        
     db.refresh(target)
     return _admin_response(target)
 
@@ -303,19 +324,24 @@ def reset_admin_password(
     
     target.password_hash = hash_password(new_password_raw)
     target.updated_at = datetime.utcnow()
-    db.add(target)
-    db.flush()
-    
-    _audit(
-        db,
-        current_user,
-        target,
-        "admin_password_reset",
-        old_value=old,
-        new_value=_snapshot(target),
-        changed_fields={"password_reset": True},
-    )
-    db.commit()
+    try:
+        db.add(target)
+        db.flush()
+        
+        _audit(
+            db,
+            current_user,
+            target,
+            "admin_password_reset",
+            old_value=old,
+            new_value=_snapshot(target),
+            changed_fields={"password_reset": True},
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+        
     db.refresh(target)
     
     resp = _admin_response(target)
@@ -335,16 +361,21 @@ def delete_admin_user(
     target = _get_privileged_user(db, user_id)
     _ensure_not_last_active_super_admin(db, target)
     old = _snapshot(target)
-    _audit(
-        db,
-        current_user,
-        target,
-        "admin_deleted",
-        old_value=old,
-        changed_fields={"deleted": True},
-    )
-    db.delete(target)
-    db.commit()
+    try:
+        _audit(
+            db,
+            current_user,
+            target,
+            "admin_deleted",
+            old_value=old,
+            changed_fields={"deleted": True},
+        )
+        db.delete(target)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+        
     return {"status": "success", "message": "Admin deleted successfully."}
 
 

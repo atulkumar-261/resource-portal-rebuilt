@@ -17,25 +17,32 @@ function AdminpayslipsnewPage() {
   const [notes, setNotes] = useState("");
   const [resourceId, setResourceId] = useState("");
   const [fileName, setFileName] = useState("No file chosen");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resourceId) {
       alert("Please select a resource");
       return;
     }
+    if (!selectedFile) {
+      alert("Please choose a file to upload");
+      return;
+    }
 
-    const r = resources.find((x) => x.id === resourceId);
-    add({
-      id: "",
-      resourceId,
-      resourceName: r?.fullName ?? "",
-      month,
-      days: Number(days) || 0,
-      amount: 0, // default amount
-      notes,
-    });
-    router.navigate({ to: "/admin/payslips" });
+    try {
+      await add({
+        resourceId,
+        month,
+        days: Number(days) || 0,
+        amount: 0, // default amount
+        notes,
+        file: selectedFile
+      });
+      router.navigate({ to: "/admin/payslips" });
+    } catch (err: any) {
+      alert(err.message || "Failed to create payslip.");
+    }
   };
 
   return (
@@ -92,6 +99,7 @@ function AdminpayslipsnewPage() {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 setFileName(file ? file.name : "No file chosen");
+                setSelectedFile(file || null);
               }}
             />
           </label>

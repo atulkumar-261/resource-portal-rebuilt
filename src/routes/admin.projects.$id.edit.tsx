@@ -16,9 +16,11 @@ function AdminprojectsideditPage() {
     <ProjectForm
       title="Edit Project"
       defaults={project}
-      onSubmit={(v) => {
-        update(id, v);
-        router.navigate({ to: "/admin/projects" });
+      onSubmit={async (v) => {
+        try {
+          await update(id, v);
+          router.navigate({ to: "/admin/projects" });
+        } catch (e) {}
       }}
     />
   );

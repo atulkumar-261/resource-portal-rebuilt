@@ -93,3 +93,13 @@ def require_privileged_user(current_user: User = Depends(get_current_user)) -> U
 def require_current_user(current_user: User = Depends(get_current_user)) -> User:
     """Any authenticated user — used for self-service endpoints (profile update, etc.)."""
     return current_user
+
+
+def require_admin_or_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.role or current_user.role.name not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Admin or Super Admin access is required to modify organizational metadata."
+        )
+    return current_user
+

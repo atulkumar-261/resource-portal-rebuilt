@@ -64,19 +64,23 @@ function UserleavesapplyPage() {
       </div>
 
       <form
-        onSubmit={handleSubmit((v) => {
-          addLeave({
-            id: "",
-            resourceId,
-            resourceName,
-            fromDate: v.fromDate,
-            toDate: mode === "single" ? v.fromDate : v.toDate,
-            totalDays: Number(v.totalDays),
-            type: v.type as any,
-            reason: v.reason,
-            status: "pending",
-          });
-          router.navigate({ to: "/user/leaves" });
+        onSubmit={handleSubmit(async (v) => {
+          try {
+            await addLeave({
+              id: "",
+              resourceId,
+              resourceName,
+              fromDate: v.fromDate,
+              toDate: mode === "single" ? v.fromDate : v.toDate,
+              totalDays: Number(v.totalDays),
+              type: v.type as any,
+              reason: v.reason,
+              status: "pending",
+            });
+            router.navigate({ to: "/user/leaves" });
+          } catch (e) {
+            // Error toast is handled by store action
+          }
         })}
         className="grid md:grid-cols-2 gap-4 max-w-3xl"
       >

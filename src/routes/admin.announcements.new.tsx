@@ -17,8 +17,9 @@ function AdminannouncementsnewPage() {
   );
   const [message, setMessage] = useState("");
   const [fileName, setFileName] = useState("No file chosen");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject.trim()) {
       alert("Please enter a subject");
@@ -29,13 +30,17 @@ function AdminannouncementsnewPage() {
       return;
     }
 
-    add({
-      id: "",
-      subject,
-      message,
-      date,
-    });
-    router.navigate({ to: "/admin/announcements" });
+    try {
+      await add({
+        subject,
+        message,
+        date,
+        file: selectedFile
+      });
+      router.navigate({ to: "/admin/announcements" });
+    } catch (err: any) {
+      alert(err.message || "Failed to create announcement.");
+    }
   };
 
   return (
@@ -83,6 +88,7 @@ function AdminannouncementsnewPage() {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 setFileName(file ? file.name : "No file chosen");
+                setSelectedFile(file || null);
               }}
             />
           </label>

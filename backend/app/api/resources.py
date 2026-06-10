@@ -27,6 +27,37 @@ from backend.app.services.progress_service import ProgressService
 
 router = APIRouter(prefix="/resources", tags=["Resources"])
 
+def _audit(
+    db: Session,
+    actor_id: Optional[UUID],
+    record_id: UUID,
+    action: str,
+    table_name: str,
+    old_value: Optional[dict] = None,
+    new_value: Optional[dict] = None,
+    changed_fields: Optional[dict] = None,
+):
+    try:
+        db.begin_nested()
+        db.add(
+            AuditLog(
+                module="user_management",
+                action=action,
+                table_name=table_name,
+                record_id=record_id,
+                old_value=old_value,
+                new_value=new_value,
+                changed_fields=changed_fields,
+                user_id=actor_id,
+            )
+        )
+        db.flush()
+    except Exception:
+        db.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Audit log failure")
+
 
 class ResourceCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=150)
@@ -82,7 +113,7 @@ class SelfProfileUpdateRequest(BaseModel):
 
 
 @router.get("/")
-def get_resources_grid(status: Optional[str] = None, db: Session = Depends(get_db_session)):
+def get_resources_grid(status: Optional[str] = None, db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
     query = db.query(Resource).filter(Resource.is_deleted == False)
     if status:
         query = query.filter(Resource.status == status)
@@ -90,22 +121,18 @@ def get_resources_grid(status: Optional[str] = None, db: Session = Depends(get_d
 
 
 @router.get("/pending")
-def get_pending_resources(db: Session = Depends(get_db_session)):
+def get_pending_resources(db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
     return db.query(Resource).filter(Resource.status == "pending", Resource.is_deleted == False).all()
 
 
-@router.get("/meta/departments")
-def get_departments(db: Session = Depends(get_db_session)):
-    return db.query(Department).all()
 
-
-@router.get("/meta/designations")
-def get_designations(db: Session = Depends(get_db_session)):
-    return db.query(Designation).all()
 
 
 @router.get("/{resource_id}")
-def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session)):
+def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
+    if current_user.role.name not in ["super_admin", "admin"] and resource_id != current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
     resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource profile not found.")
@@ -139,7 +166,7 @@ def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session
 
 
 @router.put("/{resource_id}/approve")
-def approve_pending_resource(resource_id: UUID, db: Session = Depends(get_db_session)):
+def approve_pending_resource(resource_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
     resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource profile not found.")
@@ -230,22 +257,20 @@ def create_resource(
         db.flush()
         
         # Audit Log
-        db.add(
-            AuditLog(
-                module="user_management",
-                action="resource_created",
-                table_name="users",
-                record_id=user.id,
-                new_value={
-                    "id": str(user.id),
-                    "username": user.username,
-                    "email": user.email,
-                    "full_name": user.full_name,
-                    "role": "resource",
-                    "resource_id": str(resource.id)
-                },
-                user_id=current_user.id
-            )
+        _audit(
+            db,
+            current_user.id,
+            user.id,
+            "resource_created",
+            "users",
+            new_value={
+                "id": str(user.id),
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": "resource",
+                "resource_id": str(resource.id)
+            }
         )
         db.commit()
         db.refresh(resource)
@@ -321,21 +346,19 @@ def reset_resource_password(
     db.flush()
     
     # Audit log
-    db.add(
-        AuditLog(
-            module="user_management",
-            action="resource_password_reset",
-            table_name="users",
-            record_id=user.id,
-            old_value=old_val,
-            new_value={
-                "id": str(user.id),
-                "username": user.username,
-                "is_active": user.is_active
-            },
-            changed_fields={"password_reset": True},
-            user_id=current_user.id
-        )
+    _audit(
+        db,
+        current_user.id,
+        user.id,
+        "resource_password_reset",
+        "users",
+        old_value=old_val,
+        new_value={
+            "id": str(user.id),
+            "username": user.username,
+            "is_active": user.is_active
+        },
+        changed_fields={"password_reset": True}
     )
     db.commit()
     
@@ -374,21 +397,19 @@ def update_resource_login_status(
     db.flush()
     
     action = "resource_activated" if request.is_active else "resource_deactivated"
-    db.add(
-        AuditLog(
-            module="user_management",
-            action=action,
-            table_name="users",
-            record_id=user.id,
-            old_value=old_val,
-            new_value={
-                "id": str(user.id),
-                "username": user.username,
-                "is_active": user.is_active
-            },
-            changed_fields={"is_active": {"old": old_val["is_active"], "new": request.is_active}},
-            user_id=current_user.id
-        )
+    _audit(
+        db,
+        current_user.id,
+        user.id,
+        action,
+        "users",
+        old_value=old_val,
+        new_value={
+            "id": str(user.id),
+            "username": user.username,
+            "is_active": user.is_active
+        },
+        changed_fields={"is_active": {"old": old_val["is_active"], "new": request.is_active}}
     )
     db.commit()
     return {"status": "success", "is_active": user.is_active}
@@ -428,16 +449,14 @@ def delete_resource(
         db.flush()
         
     # Audit log
-    db.add(
-        AuditLog(
-            module="user_management",
-            action="resource_deleted",
-            table_name="users",
-            record_id=user_id or resource_id,
-            old_value=old_val,
-            changed_fields={"deleted": True, "is_active": False},
-            user_id=current_user.id
-        )
+    _audit(
+        db,
+        current_user.id,
+        user_id or resource_id,
+        "resource_deleted",
+        "users",
+        old_value=old_val,
+        changed_fields={"deleted": True, "is_active": False}
     )
     db.commit()
     return {"status": "success", "message": "Resource profile soft-deleted and credentials deactivated successfully."}
@@ -477,21 +496,19 @@ def update_resource(
     db.add(resource)
     db.flush()
     
-    db.add(
-        AuditLog(
-            module="user_management",
-            action="resource_updated",
-            table_name="resources",
-            record_id=resource.id,
-            old_value=old_val,
-            new_value={
-                "id": str(resource.id),
-                "skillset": resource.skillset,
-                "weekly_allowed_hours": resource.weekly_allowed_hours,
-                "performance_notes": resource.performance_notes,
-            },
-            user_id=current_user.id
-        )
+    _audit(
+        db,
+        current_user.id,
+        resource.id,
+        "resource_updated",
+        "resources",
+        old_value=old_val,
+        new_value={
+            "id": str(resource.id),
+            "skillset": resource.skillset,
+            "weekly_allowed_hours": resource.weekly_allowed_hours,
+            "performance_notes": resource.performance_notes,
+        }
     )
     db.commit()
     db.refresh(resource)
@@ -675,15 +692,13 @@ def approve_resource_onboarding(
     resource.updated_at = datetime.utcnow()
     db.add(resource)
 
-    db.add(
-        AuditLog(
-            module="user_management",
-            action="resource_approval_granted",
-            table_name="resources",
-            record_id=resource.id,
-            new_value={"approval_status": "approved"},
-            user_id=current_user.id,
-        )
+    _audit(
+        db,
+        current_user.id,
+        resource.id,
+        "resource_approval_granted",
+        "resources",
+        new_value={"approval_status": "approved"}
     )
     db.commit()
     return {"status": "success", "resource_id": str(resource.id), "approval_status": "approved"}

@@ -27,6 +27,17 @@ def ensure_bootstrap_upgrades(cursor):
     cursor.execute("ALTER TABLE resources ADD COLUMN IF NOT EXISTS visa_number VARCHAR(100)")
     cursor.execute("ALTER TABLE resources ADD COLUMN IF NOT EXISTS visa_expiry DATE")
     cursor.execute("ALTER TABLE resources ADD COLUMN IF NOT EXISTS nationality VARCHAR(100)")
+    cursor.execute("ALTER TABLE departments ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+    cursor.execute("ALTER TABLE designations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE")
+    cursor.execute("ALTER TABLE document_attachments ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) NULL")
+    cursor.execute("ALTER TABLE document_attachments ADD COLUMN IF NOT EXISTS entity_id UUID NULL")
+    cursor.execute("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
+    cursor.execute("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL")
+    cursor.execute("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS deleted_by UUID NULL REFERENCES users(id) ON DELETE SET NULL")
+    cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
+    cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL")
+    cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS deleted_by UUID NULL REFERENCES users(id) ON DELETE SET NULL")
+
 
     # Check if resource_documents table is using the old schema or need recreation
     cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='resource_documents' AND column_name='document_type'")

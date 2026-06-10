@@ -1,10 +1,11 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useState, useEffect, type ReactNode } from "react";
-import { useAuth } from "@/lib/store";
+import { useAuth, useRMS } from "@/lib/store";
 import heroCode from "@/assets/hero-code.jpg";
 import { Menu, X, Lock } from "lucide-react";
 import { DailyReportModal } from "@/components/shared/DailyReportModal";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
+
 
 const adminNav = [
   { to: "/admin", label: "DASHBOARD", exact: true },
@@ -13,7 +14,9 @@ const adminNav = [
   { to: "/admin/clients", label: "CLIENTS" },
   { to: "/admin/projects", label: "PROJECTS" },
   { to: "/admin/resources", label: "RESOURCES" },
+  { to: "/admin/resources/org-structure", label: "ORG STRUCTURE" },
   { to: "/admin/resources/workload", label: "WORKLOAD HEATMAP" },
+
   { to: "/admin/leaves", label: "LEAVE MANAGER" },
   { to: "/admin/reports", label: "REPORTS AUDIT" },
   { to: "/admin/productivity", label: "PRODUCTIVITY" },
@@ -38,7 +41,8 @@ const userNav = [
 ];
 
 export function AppShell({ role, children }: { role: "admin" | "user"; children: ReactNode }) {
-  const { role: authRole, userName, logout, onboardingStatus } = useAuth();
+  const { role: authRole, userName, logout, onboardingStatus, token } = useAuth();
+  const initStore = useRMS((s) => s.initStore);
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const nav = role === "admin" ? (authRole === "super_admin" ? [...adminNav, ...superAdminNav] : adminNav) : userNav;
@@ -47,6 +51,12 @@ export function AppShell({ role, children }: { role: "admin" | "user"; children:
 
   // Route lock: if resource user has pending onboarding, force them to profile
   const isOnboardingLocked = role === "user" && onboardingStatus === "pending";
+
+  useEffect(() => {
+    if (token) {
+      initStore();
+    }
+  }, [token, initStore]);
 
   useEffect(() => {
     if (isOnboardingLocked && pathname !== "/user/profile") {
@@ -60,8 +70,21 @@ export function AppShell({ role, children }: { role: "admin" | "user"; children:
     router.navigate({ to: "/login" });
   };
 
-  const isActive = (n: { to: string; exact?: boolean }) =>
-    n.exact ? pathname === n.to : pathname === n.to || pathname.startsWith(n.to + "/");
+  const isActive = (n: { to: string; exact?: boolean }) => {
+    if (n.exact) return pathname === n.to;
+    if (pathname === n.to) return true;
+    if (pathname.startsWith(n.to + "/")) {
+      const hasLongerMatch = nav.some(
+        (other) =>
+          other.to !== n.to &&
+          pathname.startsWith(other.to) &&
+          other.to.length > n.to.length
+      );
+      return !hasLongerMatch;
+    }
+    return false;
+  };
+
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-800">

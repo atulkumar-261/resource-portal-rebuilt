@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from backend.app.core.config import get_db_session
-from backend.app.models.database import Project, Client, ProjectStatus, ProjectAssignment, ProjectRequirement
+from backend.app.models.database import Project, Client, ProjectStatus, ProjectAssignment, ProjectRequirement, User
 from backend.app.schemas.ai import (
     ProjectAnalysisInput,
     ProjectAnalysisResponse,
@@ -14,6 +14,7 @@ from backend.app.schemas.ai import (
     AssignmentRequest
 )
 from backend.app.services.ai.ai_orchestrator import AIOrchestrator
+from backend.app.core.security import require_privileged_user, require_current_user
 
 
 router = APIRouter(prefix="/ai", tags=["AI Project Engine"])
@@ -33,7 +34,7 @@ class AnalyzeResponseExtended(ProjectAnalysisResponse):
 
 
 @router.post("/projects/analyze", response_model=AnalyzeResponseExtended)
-async def analyze_project(request: AnalyzeRequest, db: Session = Depends(get_db_session)):
+async def analyze_project(request: AnalyzeRequest, db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
     # 1. We need a Project record to bind requirements and cache.
     # If client_id is not provided, bind to the first available client in database.
     client_id = request.client_id
@@ -89,7 +90,7 @@ async def analyze_project(request: AnalyzeRequest, db: Session = Depends(get_db_
 
 
 @router.get("/projects/{id}/recommendations", response_model=List[ModuleRecommendationGroup])
-def get_recommendations(id: UUID, db: Session = Depends(get_db_session)):
+def get_recommendations(id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
     project = db.query(Project).filter(Project.id == id, Project.is_deleted == False).first()
     if not project:
         raise HTTPException(
@@ -101,7 +102,7 @@ def get_recommendations(id: UUID, db: Session = Depends(get_db_session)):
 
 
 @router.post("/projects/{id}/assign")
-def assign_resource(id: UUID, request: AssignmentRequest, db: Session = Depends(get_db_session)):
+def assign_resource(id: UUID, request: AssignmentRequest, db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
     # Verify project exists
     project = db.query(Project).filter(Project.id == id, Project.is_deleted == False).first()
     if not project:
@@ -145,7 +146,7 @@ def assign_resource(id: UUID, request: AssignmentRequest, db: Session = Depends(
 
 
 @router.post("/projects/{id}/generate-tasks")
-async def ai_generate_tasks_for_project(id: UUID, db: Session = Depends(get_db_session)):
+async def ai_generate_tasks_for_project(id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
     from backend.app.api.tasks import generate_tasks_for_project
-    return await generate_tasks_for_project(id, db)
+    return await generate_tasks_for_project(id, db, current_user=current_user)
 

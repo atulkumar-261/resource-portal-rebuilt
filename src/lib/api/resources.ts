@@ -1,4 +1,5 @@
-import { apiFetch } from "./client";
+import { apiFetch, getApiBaseUrl } from "./client";
+import { useAuth } from "@/lib/store";
 
 export type ResourceResponse = {
   id: string;
@@ -21,6 +22,8 @@ export type ResourceResponse = {
   passport_expiry?: string | null;
   visa_number?: string | null;
   visa_expiry?: string | null;
+  department_id: string;
+  designation_id: string;
 };
 
 export type ResourceDetailResponse = {
@@ -77,21 +80,68 @@ export type Department = {
   id: string;
   name: string;
   description?: string;
+  is_active: boolean;
 };
 
 export type Designation = {
   id: string;
   title: string;
   description?: string;
+  is_active: boolean;
 };
 
-export async function fetchDepartments(): Promise<Department[]> {
-  return apiFetch<Department[]>("/resources/meta/departments");
+export async function fetchDepartments(includeInactive = false): Promise<Department[]> {
+  const activeParam = includeInactive === true;
+  return apiFetch<Department[]>(`/resources/meta/departments?include_inactive=${activeParam}`);
 }
 
-export async function fetchDesignations(): Promise<Designation[]> {
-  return apiFetch<Designation[]>("/resources/meta/designations");
+export async function fetchDesignations(includeInactive = false): Promise<Designation[]> {
+  const activeParam = includeInactive === true;
+  return apiFetch<Designation[]>(`/resources/meta/designations?include_inactive=${activeParam}`);
 }
+
+export async function createDepartment(payload: { name: string; description?: string }): Promise<Department> {
+  return apiFetch<Department>("/resources/meta/departments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDepartment(id: string, payload: { name: string; description?: string }): Promise<Department> {
+  return apiFetch<Department>(`/resources/meta/departments/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDepartmentStatus(id: string, is_active: boolean): Promise<Department> {
+  return apiFetch<Department>(`/resources/meta/departments/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active }),
+  });
+}
+
+export async function createDesignation(payload: { title: string; description?: string }): Promise<Designation> {
+  return apiFetch<Designation>("/resources/meta/designations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDesignation(id: string, payload: { title: string; description?: string }): Promise<Designation> {
+  return apiFetch<Designation>(`/resources/meta/designations/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateDesignationStatus(id: string, is_active: boolean): Promise<Designation> {
+  return apiFetch<Designation>(`/resources/meta/designations/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active }),
+  });
+}
+
 
 export async function fetchResource(resourceId: string): Promise<ResourceDetailResponse> {
   return apiFetch<ResourceDetailResponse>(`/resources/${resourceId}`);
@@ -222,8 +272,8 @@ export async function uploadResourceDocument(resourceId: string, documentType: s
   formData.append("document_type", documentType);
   formData.append("file", file);
 
-  const token = localStorage.getItem("auth_token");
-  const response = await fetch("http://localhost:8000/api/resources/documents/upload", {
+  const token = useAuth.getState().token;
+  const response = await fetch(`${getApiBaseUrl()}/resources/documents/upload`, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData, // Do not set Content-Type header for FormData, browser sets it with boundary

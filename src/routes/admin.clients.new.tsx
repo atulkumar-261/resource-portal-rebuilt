@@ -10,9 +10,11 @@ function NewClient() {
   return (
     <ClientForm
       title="Create Client"
-      onSubmit={(v) => {
-        addClient({ ...v, id: "" });
-        router.navigate({ to: "/admin/clients" });
+      onSubmit={async (v) => {
+        try {
+          await addClient({ ...v, id: "" });
+          router.navigate({ to: "/admin/clients" });
+        } catch (e) {}
       }}
     />
   );

@@ -27,15 +27,27 @@ def upload_document(
     """
     Upload a document (CV, Passport Copy, Visa Copy, etc.) for a specific resource.
     """
+    if current_user.role.name not in ["super_admin", "admin"] and resource_id != current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    from backend.app.core.file_security import validate_and_sanitize_file, check_file_size, verify_path_traversal
+
+    # Apply file security validations
+    check_file_size(file)
+    sanitized_filename = validate_and_sanitize_file(file)
+
     # Verify resource exists and isn't deleted
     resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
         
     # Generate a unique filename to prevent collisions
-    file_ext = os.path.splitext(file.filename)[1]
+    file_ext = os.path.splitext(sanitized_filename)[1]
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = UPLOAD_DIR / unique_filename
+
+    # Path traversal validation
+    verify_path_traversal(file_path, UPLOAD_DIR)
 
     # Save to local filesystem
     try:
@@ -45,16 +57,26 @@ def upload_document(
         raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
         
     # Create database record
-    doc = ResourceDocument(
-        resource_id=resource_id,
-        document_type=document_type,
-        file_name=file.filename,
-        file_path=str(file_path.as_posix()), # Store relative posix path
-        uploaded_by=current_user.id
-    )
-    db.add(doc)
-    db.commit()
-    db.refresh(doc)
+    try:
+        doc = ResourceDocument(
+            resource_id=resource_id,
+            document_type=document_type,
+            file_name=sanitized_filename,
+            file_path=str(file_path.as_posix()), # Store relative posix path
+            uploaded_by=current_user.id
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+    except Exception as e:
+        db.rollback()
+        # Clean up the saved file
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
     
     return {
         "id": doc.id,
@@ -74,6 +96,9 @@ def get_resource_documents(
     """
     Get all documents for a specific resource.
     """
+    if current_user.role.name not in ["super_admin", "admin"] and resource_id != current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
     documents = db.query(ResourceDocument).filter(ResourceDocument.resource_id == resource_id).order_by(ResourceDocument.uploaded_at.desc()).all()
     
     result = []
@@ -101,16 +126,26 @@ def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
+    if current_user.role.name not in ["super_admin", "admin"] and doc.resource_id != current_user.resource_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
     # Remove from filesystem
+    from backend.app.core.file_security import verify_path_traversal
+
     try:
         path = Path(doc.file_path)
+        verify_path_traversal(path, UPLOAD_DIR)
         if path.exists():
             path.unlink()
     except Exception as e:
         print(f"Failed to delete file {doc.file_path}: {e}")
         
     # Remove from db
-    db.delete(doc)
-    db.commit()
+    try:
+        db.delete(doc)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
     
     return {"status": "success", "message": "Document deleted successfully"}

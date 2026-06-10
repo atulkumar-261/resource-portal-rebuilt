@@ -23,15 +23,16 @@ import type {
   ProjectProgress,
   ProductivityMetrics
 } from "./types";
+import { toast } from "sonner";
+import { fetchResources } from "./api/resources";
+import { fetchClients, createClient, updateClient as updateClientApi, deleteClient as deleteClientApi } from "./api/clients";
+import { fetchProjects, createProject, updateProject as updateProjectApi, deleteProject as deleteProjectApi } from "./api/projects";
+import { fetchTasks, createTask, updateTask as updateTaskApi, deleteTask as deleteTaskApi } from "./api/tasks";
+import { fetchLeaves, applyLeave, updateLeaveStatus, deleteLeave as deleteLeaveApi, fetchLeaveBalances } from "./api/leaves";
+import { fetchTimesheets, submitTimesheet, approveTimesheet, deleteTimesheet as deleteTimesheetApi } from "./api/timesheets";
+import { fetchPayslips, createPayslip, deletePayslip as deletePayslipApi } from "./api/payslips";
+import { fetchAnnouncements, createAnnouncement, deleteAnnouncement as deleteAnnouncementApi, uploadAnnouncementFile } from "./api/announcements";
 import {
-  initialResources,
-  initialClients,
-  initialProjects,
-  initialTasks,
-  initialLeaves,
-  initialTimesheets,
-  initialPayslips,
-  initialAnnouncements,
   initialProjectRequirements,
   initialProjectSkillRequirements,
   initialProjectAssignments,
@@ -115,35 +116,37 @@ interface RMSState {
   dailyReports: DailyReport[];
   dailyReportItems: DailyReportItem[];
 
-  addResource: (r: Resource) => void;
-  updateResource: (id: string, patch: Partial<Resource>) => void;
-  deleteResource: (id: string) => void;
+  initStore: () => Promise<void>;
 
-  addClient: (c: Client) => void;
-  updateClient: (id: string, patch: Partial<Client>) => void;
-  deleteClient: (id: string) => void;
+  addResource: (r: Resource) => Promise<void>;
+  updateResource: (id: string, patch: Partial<Resource>) => Promise<void>;
+  deleteResource: (id: string) => Promise<void>;
 
-  addProject: (p: Project) => void;
-  updateProject: (id: string, patch: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
+  addClient: (c: Client) => Promise<void>;
+  updateClient: (id: string, patch: Partial<Client>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
 
-  addTask: (t: Task) => void;
-  updateTask: (id: string, patch: Partial<Task>) => void;
-  deleteTask: (id: string) => void;
+  addProject: (p: Project) => Promise<void>;
+  updateProject: (id: string, patch: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
 
-  addLeave: (l: Leave) => void;
-  updateLeave: (id: string, patch: Partial<Leave>) => void;
-  deleteLeave: (id: string) => void;
+  addTask: (t: Task) => Promise<void>;
+  updateTask: (id: string, patch: Partial<Task>) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
 
-  addTimesheet: (t: Timesheet) => void;
-  updateTimesheet: (id: string, patch: Partial<Timesheet>) => void;
-  deleteTimesheet: (id: string) => void;
+  addLeave: (l: Leave) => Promise<void>;
+  updateLeave: (id: string, patch: Partial<Leave>) => Promise<void>;
+  deleteLeave: (id: string) => Promise<void>;
 
-  addPayslip: (p: Payslip) => void;
-  deletePayslip: (id: string) => void;
+  addTimesheet: (t: any) => Promise<void>;
+  updateTimesheet: (id: string, patch: Partial<Timesheet>) => Promise<void>;
+  deleteTimesheet: (id: string) => Promise<void>;
 
-  addAnnouncement: (a: Announcement) => void;
-  deleteAnnouncement: (id: string) => void;
+  addPayslip: (p: any) => Promise<void>;
+  deletePayslip: (id: string) => Promise<void>;
+
+  addAnnouncement: (a: any) => Promise<void>;
+  deleteAnnouncement: (id: string) => Promise<void>;
 
   addProjectRequirements: (reqs: ProjectRequirement[]) => void;
   updateProjectRequirement: (id: number, patch: Partial<ProjectRequirement>) => void;
@@ -189,15 +192,18 @@ export const fetchWithTimeout = async (
 };
 
 
+let _storeInitPromise: Promise<void> | null = null;
+let _initializedToken: string | null = null;
+
 export const useRMS = create<RMSState>((set, get) => ({
-  resources: initialResources,
-  clients: initialClients,
-  projects: initialProjects,
-  tasks: initialTasks,
-  leaves: initialLeaves,
-  timesheets: initialTimesheets,
-  payslips: initialPayslips,
-  announcements: initialAnnouncements,
+  resources: [],
+  clients: [],
+  projects: [],
+  tasks: [],
+  leaves: [],
+  timesheets: [],
+  payslips: [],
+  announcements: [],
   projectRequirements: initialProjectRequirements,
   projectSkillRequirements: initialProjectSkillRequirements,
   projectAssignments: initialProjectAssignments,
@@ -208,43 +214,603 @@ export const useRMS = create<RMSState>((set, get) => ({
   dailyReports: initialDailyReports,
   dailyReportItems: initialDailyReportItems,
 
-  addResource: (r) => set((s) => ({ resources: [...s.resources, { ...r, id: r.id || uid() }] })),
-  updateResource: (id, patch) =>
-    set((s) => ({ resources: s.resources.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteResource: (id) => set((s) => ({ resources: s.resources.filter((x) => x.id !== id) })),
+  initStore: async () => {
+    const token = useAuth.getState().token;
+    if (!token) {
+      _storeInitPromise = null;
+      _initializedToken = null;
+      return;
+    }
 
-  addClient: (c) => set((s) => ({ clients: [...s.clients, { ...c, id: c.id || uid() }] })),
-  updateClient: (id, patch) =>
-    set((s) => ({ clients: s.clients.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteClient: (id) => set((s) => ({ clients: s.clients.filter((x) => x.id !== id) })),
+    if (_initializedToken !== token) {
+      _storeInitPromise = null;
+    }
 
-  addProject: (p) => set((s) => ({ projects: [...s.projects, { ...p, id: p.id || uid() }] })),
-  updateProject: (id, patch) =>
-    set((s) => ({ projects: s.projects.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteProject: (id) => set((s) => ({ projects: s.projects.filter((x) => x.id !== id) })),
+    if (_storeInitPromise) return _storeInitPromise;
 
-  addTask: (t) => set((s) => ({ tasks: [...s.tasks, { ...t, id: t.id || uid() }] })),
-  updateTask: (id, patch) =>
-    set((s) => ({ tasks: s.tasks.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteTask: (id) => set((s) => ({ tasks: s.tasks.filter((x) => x.id !== id) })),
+    _initializedToken = token;
+    _storeInitPromise = (async () => {
+      try {
+        const [
+          resList,
+          clientList,
+          projectList,
+          taskList,
+          leaveList,
+          timesheetList,
+          payslipList,
+          announcementList
+        ] = await Promise.all([
+          fetchResources().catch(() => []),
+          fetchClients().catch(() => []),
+          fetchProjects().catch(() => []),
+          fetchTasks().catch(() => []),
+          fetchLeaves().catch(() => []),
+          fetchTimesheets().catch(() => []),
+          fetchPayslips().catch(() => []),
+          fetchAnnouncements().catch(() => [])
+        ]);
 
-  addLeave: (l) => set((s) => ({ leaves: [...s.leaves, { ...l, id: l.id || uid() }] })),
-  updateLeave: (id, patch) =>
-    set((s) => ({ leaves: s.leaves.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteLeave: (id) => set((s) => ({ leaves: s.leaves.filter((x) => x.id !== id) })),
+        const resources: Resource[] = resList.map((r: any) => ({
+          id: r.id,
+          fullName: r.full_name ?? "",
+          jobTitle: r.designation_title || r.jobTitle || "Developer",
+          email: r.email ?? "",
+          employeeId: r.employee_id ?? "",
+          skillset: r.skillset ?? "",
+          phone: r.phone ?? "",
+          address: r.address ?? "",
+          citizenOf: r.citizen_of ?? "",
+          passportNumber: r.passport_number ?? "",
+          passportExpiry: r.passport_expiry ?? "",
+          visaNumber: r.visa_number ?? "",
+          visaExpiry: r.visa_expiry ?? "",
+          niNumber: r.ni_number ?? "",
+          dob: r.dob ?? "",
+          bankAccount: r.account_number ?? "",
+          sortCode: r.sort_code ?? "",
+          bankName: r.bank_name ?? "",
+          emergencyName: r.emergency_contact_name ?? "",
+          emergencyPhone: r.emergency_contact_phone ?? "",
+          emergencyEmail: r.emergency_contact_email ?? "",
+          emergencyAddress: r.emergency_contact_address ?? "",
+          status: (r.status || "active") as any,
+          avatarUrl: r.avatar_url ?? undefined,
+          weeklyAllowedHours: r.weekly_allowed_hours ?? 35,
+          performanceNotes: r.performance_notes ?? "",
+          otherInfo: r.other_info ?? "",
+        }));
 
-  addTimesheet: (t) => set((s) => ({ timesheets: [{ ...t, id: t.id || uid() }, ...s.timesheets] })),
-  updateTimesheet: (id, patch) =>
-    set((s) => ({ timesheets: s.timesheets.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteTimesheet: (id) => set((s) => ({ timesheets: s.timesheets.filter((x) => x.id !== id) })),
+        const clients: Client[] = clientList.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          contactPerson: c.contact_person || "",
+          email: c.email || "",
+          phone: c.phone || "",
+          address: c.address || ""
+        }));
 
-  addPayslip: (p) => set((s) => ({ payslips: [{ ...p, id: p.id || uid() }, ...s.payslips] })),
-  deletePayslip: (id) => set((s) => ({ payslips: s.payslips.filter((x) => x.id !== id) })),
+        const projects: Project[] = projectList.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          client: p.client || "",
+          startDate: p.startDate || "",
+          endDate: p.endDate || "",
+          status: p.status || "active",
+          description: p.description || ""
+        }));
 
-  addAnnouncement: (a) =>
-    set((s) => ({ announcements: [{ ...a, id: a.id || uid() }, ...s.announcements] })),
-  deleteAnnouncement: (id) =>
-    set((s) => ({ announcements: s.announcements.filter((x) => x.id !== id) })),
+        const tasks: Task[] = taskList.map((t: any) => ({
+          id: t.id,
+          subject: t.subject || "",
+          startDate: t.startDate || "",
+          resourceId: t.resourceId || "",
+          resourceName: t.resourceName || "",
+          project: t.project || "",
+          notes: t.notes || "",
+          status: t.status || "pending"
+        }));
+
+        const leaves: Leave[] = leaveList.map((l: any) => ({
+          id: l.id,
+          resourceId: l.resourceId,
+          resourceName: l.resourceName,
+          fromDate: l.fromDate,
+          toDate: l.toDate,
+          totalDays: l.totalDays,
+          type: l.type as any,
+          reason: l.reason || "",
+          status: l.status
+        }));
+
+        const timesheets: Timesheet[] = timesheetList.map((ts: any) => ({
+          id: ts.id,
+          resourceId: ts.resourceId,
+          resourceName: ts.resourceName,
+          weekNumber: ts.weekNumber,
+          weekEndDate: ts.weekEndDate,
+          totalHours: ts.totalHours,
+          status: ts.status,
+          projectName: ts.projectName,
+          dailyHours: ts.dailyHours
+        }));
+
+        const payslips: Payslip[] = payslipList.map((p: any) => ({
+          id: p.id,
+          resourceId: p.resourceId,
+          resourceName: p.resourceName,
+          month: p.month,
+          days: p.days,
+          notes: p.notes || "",
+          amount: p.amount
+        }));
+
+        const announcements: Announcement[] = announcementList.map((a: any) => ({
+          id: a.id,
+          subject: a.subject,
+          message: a.message,
+          date: a.date
+        }));
+
+        set({
+          resources,
+          clients,
+          projects,
+          tasks,
+          leaves,
+          timesheets,
+          payslips,
+          announcements
+        });
+      } catch (e) {
+        console.error("Failed to initialize store from database", e);
+        _storeInitPromise = null;
+        _initializedToken = null;
+        throw e;
+      }
+    })();
+    return _storeInitPromise;
+  },
+
+  addResource: async (r) => {
+    console.warn("[DEPRECATED] addResource store action is a local-only stub. Use React Query mutations from api/resources.ts instead.");
+    set((s) => ({ resources: [...s.resources, { ...r, id: r.id || uid() }] }));
+  },
+  updateResource: async (id, patch) => {
+    console.warn("[DEPRECATED] updateResource store action is a local-only stub. Use React Query mutations from api/resources.ts instead.");
+    set((s) => ({ resources: s.resources.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+  },
+  deleteResource: async (id) => {
+    console.warn("[DEPRECATED] deleteResource store action is a local-only stub. Use React Query mutations from api/resources.ts instead.");
+    set((s) => ({ resources: s.resources.filter((x) => x.id !== id) }));
+  },
+
+  addClient: async (c) => {
+    try {
+      const response = await createClient({
+        name: c.name,
+        contact_person: c.contactPerson,
+        email: c.email,
+        phone: c.phone,
+        address: c.address
+      });
+      const newClient: Client = {
+        id: response.id,
+        name: response.name,
+        contactPerson: response.contact_person || "",
+        email: response.email || "",
+        phone: response.phone || "",
+        address: response.address || ""
+      };
+      set((s) => ({ clients: [...s.clients, newClient] }));
+      toast.success("Client added successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to add client.");
+      throw e;
+    }
+  },
+  updateClient: async (id, patch) => {
+    try {
+      const response = await updateClientApi(id, {
+        name: patch.name,
+        contact_person: patch.contactPerson,
+        email: patch.email,
+        phone: patch.phone,
+        address: patch.address
+      });
+      set((s) => ({
+        clients: s.clients.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                name: response.name,
+                contactPerson: response.contact_person || "",
+                email: response.email || "",
+                phone: response.phone || "",
+                address: response.address || ""
+              }
+            : x
+        )
+      }));
+      toast.success("Client updated successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to update client.");
+      throw e;
+    }
+  },
+  deleteClient: async (id) => {
+    try {
+      await deleteClientApi(id);
+      set((s) => ({ clients: s.clients.filter((x) => x.id !== id) }));
+      toast.success("Client deleted successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete client.");
+      throw e;
+    }
+  },
+
+  addProject: async (p) => {
+    try {
+      if (p.id) {
+        const exists = get().projects.some((x) => x.id === p.id);
+        if (exists) return;
+        set((s) => ({ projects: [...s.projects, p] }));
+        return;
+      }
+      const response = await createProject({
+        name: p.name,
+        client: p.client,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        status: p.status,
+        description: p.description
+      });
+      const newProject: Project = {
+        id: response.id,
+        name: response.name,
+        client: response.client || "",
+        startDate: response.startDate || "",
+        endDate: response.endDate || "",
+        status: response.status || "active",
+        description: response.description || ""
+      };
+      set((s) => ({ projects: [...s.projects, newProject] }));
+      toast.success("Project created successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to create project.");
+      throw e;
+    }
+  },
+  updateProject: async (id, patch) => {
+    try {
+      const response = await updateProjectApi(id, {
+        name: patch.name,
+        client: patch.client,
+        startDate: patch.startDate,
+        endDate: patch.endDate,
+        status: patch.status,
+        description: patch.description
+      });
+      set((s) => ({
+        projects: s.projects.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                name: response.name,
+                client: response.client || "",
+                startDate: response.startDate || "",
+                endDate: response.endDate || "",
+                status: response.status || "active",
+                description: response.description || ""
+              }
+            : x
+        )
+      }));
+      toast.success("Project updated successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to update project.");
+      throw e;
+    }
+  },
+  deleteProject: async (id) => {
+    try {
+      await deleteProjectApi(id);
+      set((s) => ({ projects: s.projects.filter((x) => x.id !== id) }));
+      toast.success("Project deleted successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete project.");
+      throw e;
+    }
+  },
+
+  addTask: async (t) => {
+    try {
+      const response = await createTask({
+        subject: t.subject,
+        startDate: t.startDate,
+        resourceId: t.resourceId,
+        project: t.project,
+        notes: t.notes
+      });
+      const newTask: Task = {
+        id: response.id,
+        subject: response.subject,
+        startDate: response.startDate,
+        resourceId: response.resourceId,
+        resourceName: response.resourceName,
+        project: response.project,
+        notes: response.notes || "",
+        status: response.status
+      };
+      set((s) => ({ tasks: [...s.tasks, newTask] }));
+      toast.success("Task created successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to create task.");
+      throw e;
+    }
+  },
+  updateTask: async (id, patch) => {
+    try {
+      const response = await updateTaskApi(id, {
+        subject: patch.subject,
+        startDate: patch.startDate,
+        resourceId: patch.resourceId,
+        project: patch.project,
+        notes: patch.notes,
+        status: patch.status
+      });
+      set((s) => ({
+        tasks: s.tasks.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                subject: response.subject,
+                startDate: response.startDate,
+                resourceId: response.resourceId,
+                resourceName: response.resourceName,
+                project: response.project,
+                notes: response.notes || "",
+                status: response.status
+              }
+            : x
+        )
+      }));
+      toast.success("Task updated successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to update task.");
+      throw e;
+    }
+  },
+  deleteTask: async (id) => {
+    try {
+      await deleteTaskApi(id);
+      set((s) => ({ tasks: s.tasks.filter((x) => x.id !== id) }));
+      toast.success("Task deleted successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete task.");
+      throw e;
+    }
+  },
+
+  addLeave: async (l) => {
+    try {
+      const balances = await fetchLeaveBalances(l.resourceId);
+      const bal = balances.find((b) => b.leave_type_name.toLowerCase() === l.type.toLowerCase());
+      if (!bal) {
+        throw new Error(`Leave type "${l.type}" not found in resource balances.`);
+      }
+      const resp = await applyLeave({
+        leaveTypeId: bal.leave_type_id,
+        fromDate: l.fromDate,
+        toDate: l.toDate,
+        reason: l.reason
+      });
+      const newLeave: Leave = {
+        id: resp.id,
+        resourceId: resp.resourceId,
+        resourceName: resp.resourceName,
+        fromDate: resp.fromDate,
+        toDate: resp.toDate,
+        totalDays: resp.totalDays,
+        type: resp.type as any,
+        reason: resp.reason || "",
+        status: resp.status as any
+      };
+      set((s) => ({ leaves: [newLeave, ...s.leaves] }));
+      toast.success("Leave applied successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to apply for leave");
+      throw e;
+    }
+  },
+  updateLeave: async (id, patch) => {
+    try {
+      if (patch.status === "approved" || patch.status === "rejected") {
+        const response = await updateLeaveStatus(id, patch.status);
+        set((s) => ({
+          leaves: s.leaves.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: response.status as any
+                }
+              : x
+          )
+        }));
+        toast.success(`Leave request ${patch.status}.`);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to update leave status.");
+      throw e;
+    }
+  },
+  deleteLeave: async (id) => {
+    try {
+      await deleteLeaveApi(id);
+      set((s) => ({ leaves: s.leaves.filter((x) => x.id !== id) }));
+      toast.success("Leave request deleted.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete leave request.");
+      throw e;
+    }
+  },
+
+  addTimesheet: async (t) => {
+    try {
+      const response = await submitTimesheet({
+        week_end_date: t.weekEndDate,
+        rows: t.rows.map((r: any) => ({
+          project_id: r.projectId,
+          daily_entries: r.dailyEntries.map((e: any) => ({
+            work_date: e.workDate,
+            hours: e.hours,
+            remarks: e.remarks
+          }))
+        }))
+      });
+      const newTimesheet: Timesheet = {
+        id: response.id,
+        resourceId: response.resourceId,
+        resourceName: response.resourceName,
+        weekNumber: response.weekNumber,
+        weekEndDate: response.weekEndDate,
+        totalHours: response.totalHours,
+        status: response.status,
+        projectName: response.projectName,
+        dailyHours: response.dailyHours
+      };
+      set((s) => ({ timesheets: [newTimesheet, ...s.timesheets] }));
+      toast.success("Timesheet submitted successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to submit timesheet.");
+      throw e;
+    }
+  },
+  updateTimesheet: async (id, patch) => {
+    try {
+      if (patch.status === "approved" || patch.status === "rejected") {
+        const response = await approveTimesheet(id, patch.status);
+        set((s) => ({
+          timesheets: s.timesheets.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: response.status as any
+                }
+              : x
+          )
+        }));
+        toast.success(`Timesheet ${patch.status}.`);
+      } else {
+        set((s) => ({
+          timesheets: s.timesheets.map((x) => (x.id === id ? { ...x, ...patch } : x))
+        }));
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to update timesheet.");
+      throw e;
+    }
+  },
+  deleteTimesheet: async (id) => {
+    try {
+      await deleteTimesheetApi(id);
+      set((s) => ({ timesheets: s.timesheets.filter((x) => x.id !== id) }));
+      toast.success("Timesheet deleted.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete timesheet.");
+      throw e;
+    }
+  },
+
+  addPayslip: async (p) => {
+    try {
+      const response = await createPayslip({
+        month: p.month,
+        days: p.days,
+        notes: p.notes,
+        resourceId: p.resourceId,
+        amount: p.amount,
+        file: p.file
+      });
+      const newPayslip: Payslip = {
+        id: response.id,
+        resourceId: response.resourceId,
+        resourceName: response.resourceName,
+        month: response.month,
+        days: response.days,
+        notes: response.notes || "",
+        amount: response.amount
+      };
+      set((s) => ({ payslips: [newPayslip, ...s.payslips] }));
+      toast.success("Payslip generated successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to create payslip.");
+      throw e;
+    }
+  },
+  deletePayslip: async (id) => {
+    try {
+      await deletePayslipApi(id);
+      set((s) => ({ payslips: s.payslips.filter((x) => x.id !== id) }));
+      toast.success("Payslip deleted.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete payslip.");
+      throw e;
+    }
+  },
+
+  addAnnouncement: async (a) => {
+    try {
+      const response = await createAnnouncement({
+        subject: a.subject,
+        message: a.message,
+        date: a.date
+      });
+      if (a.file) {
+        await uploadAnnouncementFile(response.id, a.file);
+      }
+      const newAnnouncement: Announcement = {
+        id: response.id,
+        subject: response.subject,
+        message: response.message,
+        date: response.date
+      };
+      set((s) => ({ announcements: [newAnnouncement, ...s.announcements] }));
+      toast.success("Announcement posted successfully.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to create announcement.");
+      throw e;
+    }
+  },
+  deleteAnnouncement: async (id) => {
+    try {
+      await deleteAnnouncementApi(id);
+      set((s) => ({ announcements: s.announcements.filter((x) => x.id !== id) }));
+      toast.success("Announcement deleted.");
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || "Failed to delete announcement.");
+      throw e;
+    }
+  },
 
   addProjectRequirements: (reqs) => set((s) => ({ projectRequirements: [...s.projectRequirements, ...reqs] })),
   updateProjectRequirement: (id, patch) =>

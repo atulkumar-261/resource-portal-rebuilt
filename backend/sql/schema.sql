@@ -31,14 +31,17 @@ CREATE TABLE cities (
 CREATE TABLE departments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT NULL
+    description TEXT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE designations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(100) NOT NULL UNIQUE,
-    description TEXT NULL
+    description TEXT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
+
 
 CREATE TABLE skills_master (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -508,7 +511,6 @@ CREATE TABLE notification_logs (
 CREATE INDEX idx_resources_status ON resources(status_id);
 CREATE INDEX idx_resources_deleted ON resources(is_deleted);
 CREATE INDEX idx_users_active ON users(is_active);
-CREATE INDEX idx_resource_docs_expiry ON resource_documents(expiry_date) WHERE is_deleted IS FALSE;
 CREATE INDEX idx_timesheets_res_week ON timesheets(resource_id, week_end_date) WHERE is_deleted IS FALSE;
 CREATE INDEX idx_timesheet_entries_ts ON timesheet_entries(timesheet_id);
 CREATE INDEX idx_timesheet_entries_date ON timesheet_entries(work_date);

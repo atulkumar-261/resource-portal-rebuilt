@@ -46,6 +46,7 @@ import { Route as AdminTasksNewRouteImport } from './routes/admin.tasks.new'
 import { Route as AdminTasksIdRouteImport } from './routes/admin.tasks.$id'
 import { Route as AdminResourcesWorkloadRouteImport } from './routes/admin.resources.workload'
 import { Route as AdminResourcesPendingRouteImport } from './routes/admin.resources.pending'
+import { Route as AdminResourcesOrgStructureRouteImport } from './routes/admin.resources.org-structure'
 import { Route as AdminResourcesIdRouteImport } from './routes/admin.resources.$id'
 import { Route as AdminReportsVisaExpiryRouteImport } from './routes/admin.reports.visa-expiry'
 import { Route as AdminReportsTimesheetsRouteImport } from './routes/admin.reports.timesheets'
@@ -251,6 +252,12 @@ const AdminResourcesPendingRoute = AdminResourcesPendingRouteImport.update({
   path: '/resources/pending',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminResourcesOrgStructureRoute =
+  AdminResourcesOrgStructureRouteImport.update({
+    id: '/resources/org-structure',
+    path: '/resources/org-structure',
+    getParentRoute: () => AdminRoute,
+  } as any)
 const AdminResourcesIdRoute = AdminResourcesIdRouteImport.update({
   id: '/resources/$id',
   path: '/resources/$id',
@@ -386,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/admin/reports/timesheets': typeof AdminReportsTimesheetsRoute
   '/admin/reports/visa-expiry': typeof AdminReportsVisaExpiryRoute
   '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/org-structure': typeof AdminResourcesOrgStructureRoute
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/resources/workload': typeof AdminResourcesWorkloadRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
@@ -440,6 +448,7 @@ export interface FileRoutesByTo {
   '/admin/reports/timesheets': typeof AdminReportsTimesheetsRoute
   '/admin/reports/visa-expiry': typeof AdminReportsVisaExpiryRoute
   '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/org-structure': typeof AdminResourcesOrgStructureRoute
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/resources/workload': typeof AdminResourcesWorkloadRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
@@ -499,6 +508,7 @@ export interface FileRoutesById {
   '/admin/reports/timesheets': typeof AdminReportsTimesheetsRoute
   '/admin/reports/visa-expiry': typeof AdminReportsVisaExpiryRoute
   '/admin/resources/$id': typeof AdminResourcesIdRoute
+  '/admin/resources/org-structure': typeof AdminResourcesOrgStructureRoute
   '/admin/resources/pending': typeof AdminResourcesPendingRoute
   '/admin/resources/workload': typeof AdminResourcesWorkloadRoute
   '/admin/tasks/$id': typeof AdminTasksIdRoute
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/admin/reports/timesheets'
     | '/admin/reports/visa-expiry'
     | '/admin/resources/$id'
+    | '/admin/resources/org-structure'
     | '/admin/resources/pending'
     | '/admin/resources/workload'
     | '/admin/tasks/$id'
@@ -613,6 +624,7 @@ export interface FileRouteTypes {
     | '/admin/reports/timesheets'
     | '/admin/reports/visa-expiry'
     | '/admin/resources/$id'
+    | '/admin/resources/org-structure'
     | '/admin/resources/pending'
     | '/admin/resources/workload'
     | '/admin/tasks/$id'
@@ -671,6 +683,7 @@ export interface FileRouteTypes {
     | '/admin/reports/timesheets'
     | '/admin/reports/visa-expiry'
     | '/admin/resources/$id'
+    | '/admin/resources/org-structure'
     | '/admin/resources/pending'
     | '/admin/resources/workload'
     | '/admin/tasks/$id'
@@ -964,6 +977,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminResourcesPendingRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/resources/org-structure': {
+      id: '/admin/resources/org-structure'
+      path: '/resources/org-structure'
+      fullPath: '/admin/resources/org-structure'
+      preLoaderRoute: typeof AdminResourcesOrgStructureRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/resources/$id': {
       id: '/admin/resources/$id'
       path: '/resources/$id'
@@ -1170,6 +1190,7 @@ interface AdminRouteChildren {
   AdminProjectsNewRoute: typeof AdminProjectsNewRoute
   AdminProjectsNewAiRoute: typeof AdminProjectsNewAiRoute
   AdminResourcesIdRoute: typeof AdminResourcesIdRoute
+  AdminResourcesOrgStructureRoute: typeof AdminResourcesOrgStructureRoute
   AdminResourcesPendingRoute: typeof AdminResourcesPendingRoute
   AdminResourcesWorkloadRoute: typeof AdminResourcesWorkloadRoute
   AdminTasksIdRoute: typeof AdminTasksIdRoute
@@ -1201,6 +1222,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminProjectsNewRoute: AdminProjectsNewRoute,
   AdminProjectsNewAiRoute: AdminProjectsNewAiRoute,
   AdminResourcesIdRoute: AdminResourcesIdRoute,
+  AdminResourcesOrgStructureRoute: AdminResourcesOrgStructureRoute,
   AdminResourcesPendingRoute: AdminResourcesPendingRoute,
   AdminResourcesWorkloadRoute: AdminResourcesWorkloadRoute,
   AdminTasksIdRoute: AdminTasksIdRoute,

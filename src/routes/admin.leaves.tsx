@@ -17,6 +17,9 @@ function LeavesPage() {
   const del = useRMS((s) => s.deleteLeave);
   const resources = useRMS((s) => s.resources);
 
+  // Track processing ID for mutations
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
   // Sidebar search state
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -51,38 +54,65 @@ function LeavesPage() {
     {
       header: "Actions",
       id: "a",
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          {row.original.status === "pending" && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-emerald-700 border-emerald-300"
-                onClick={() => updateLeave(row.original.id, { status: "approved" })}
-              >
-                Approve
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="text-rose-700 border-rose-300"
-                onClick={() => updateLeave(row.original.id, { status: "rejected" })}
-              >
-                Reject
-              </Button>
-            </>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-rose-600"
-            onClick={() => del(row.original.id)}
-          >
-            Delete
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const isProcessing = processingId === row.original.id;
+        return (
+          <div className="flex gap-1">
+            {row.original.status === "pending" && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-emerald-700 border-emerald-300"
+                  disabled={isProcessing}
+                  onClick={async () => {
+                    setProcessingId(row.original.id);
+                    try {
+                      await updateLeave(row.original.id, { status: "approved" });
+                    } finally {
+                      setProcessingId(null);
+                    }
+                  }}
+                >
+                  {isProcessing ? "..." : "Approve"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-rose-700 border-rose-300"
+                  disabled={isProcessing}
+                  onClick={async () => {
+                    setProcessingId(row.original.id);
+                    try {
+                      await updateLeave(row.original.id, { status: "rejected" });
+                    } finally {
+                      setProcessingId(null);
+                    }
+                  }}
+                >
+                  {isProcessing ? "..." : "Reject"}
+                </Button>
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-rose-600"
+              disabled={isProcessing}
+              onClick={async () => {
+                setProcessingId(row.original.id);
+                try {
+                  await del(row.original.id);
+                } finally {
+                  setProcessingId(null);
+                }
+              }}
+            >
+              {isProcessing ? "..." : "Delete"}
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 

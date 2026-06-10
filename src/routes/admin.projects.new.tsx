@@ -12,9 +12,11 @@ function AdminprojectsnewPage() {
   return (
     <ProjectForm
       title="Create Project"
-      onSubmit={(v) => {
-        add({ ...v, id: "" });
-        router.navigate({ to: "/admin/projects" });
+      onSubmit={async (v) => {
+        try {
+          await add({ ...v, id: "" });
+          router.navigate({ to: "/admin/projects" });
+        } catch (e) {}
       }}
     />
   );

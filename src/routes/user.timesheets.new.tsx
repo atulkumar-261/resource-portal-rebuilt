@@ -147,7 +147,7 @@ function UsertimesheetsnewPage() {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const hasEmptyProject = rows.some((r) => !r.projectName);
     if (hasEmptyProject) {
       alert("Please select a project for all timesheet rows.");
@@ -160,24 +160,46 @@ function UsertimesheetsnewPage() {
       return;
     }
 
-    // Add timesheet for each project row
-    rows.forEach((row) => {
-      const totalHours = row.hours.reduce((a, b) => a + b, 0);
-      addTs({
-        id: "",
-        resourceId,
-        resourceName,
-        weekNumber: getWeekNumber(selectedWeek),
-        weekEndDate: formatWeekEndDate(selectedWeek),
-        totalHours,
-        status: "pending",
-        projectName: row.projectName,
-        dailyHours: row.hours,
+    // Resolve weekEndDate
+    const cleanStr = selectedWeek.replace("W/e ", "");
+    const dateObj = new Date(cleanStr);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(dateObj.getDate()).padStart(2, "0");
+    const weekEndDate = `${yyyy}-${mm}-${dd}`;
+
+    // Map rows to request structure
+    const payloadRows = rows.map((row) => {
+      const proj = allProjects.find((p) => p.name === row.projectName);
+      const projectId = proj ? proj.id : "";
+
+      const dailyEntries = row.hours.map((hours, dayIdx) => {
+        const dStr = weekDates[dayIdx]; // DD-MM-YYYY
+        const parts = dStr.split("-");
+        const workDate = `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
+        return {
+          workDate,
+          hours,
+          remarks: `Logged ${hours} hours for ${row.projectName}`,
+        };
       });
+
+      return {
+        projectId,
+        dailyEntries,
+      };
     });
 
-    alert("Timesheet submitted to Admin successfully!");
-    router.navigate({ to: "/user/timesheets" });
+    try {
+      await addTs({
+        weekEndDate,
+        rows: payloadRows,
+      });
+      alert("Timesheet submitted to Admin successfully!");
+      router.navigate({ to: "/user/timesheets" });
+    } catch (e: any) {
+      alert(e.message || "Failed to submit timesheet.");
+    }
   };
 
   return (

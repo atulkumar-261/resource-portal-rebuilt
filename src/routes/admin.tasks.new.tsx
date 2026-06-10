@@ -28,19 +28,23 @@ function NewTask() {
   return (
     <PageCard title="Create Task">
       <form
-        onSubmit={handleSubmit((v) => {
+        onSubmit={handleSubmit(async (v) => {
           const r = resources.find((x) => x.id === v.resourceId);
-          add({
-            id: "",
-            subject: v.subject,
-            startDate: v.startDate,
-            resourceId: v.resourceId,
-            resourceName: r?.fullName ?? "",
-            project: v.project,
-            notes: v.notes,
-            status: "pending",
-          });
-          router.navigate({ to: "/admin/tasks" });
+          try {
+            await add({
+              id: "",
+              subject: v.subject,
+              startDate: v.startDate,
+              resourceId: v.resourceId,
+              resourceName: r?.fullName ?? "",
+              project: v.project,
+              notes: v.notes,
+              status: "pending",
+            });
+            router.navigate({ to: "/admin/tasks" });
+          } catch (e) {
+            // Error toast is handled by store action
+          }
         })}
         className="grid md:grid-cols-2 gap-4 max-w-3xl"
       >
