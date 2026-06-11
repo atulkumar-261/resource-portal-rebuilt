@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { DailyReport } from "@/lib/types";
+import { isResourceAssignable, type DailyReport } from "@/lib/types";
 import {
   FileSearch,
   Users,
@@ -35,6 +35,7 @@ export const Route = createFileRoute("/admin/reports")({
 
 function AdminReportsAuditPage() {
   const resources = useRMS((s) => s.resources);
+  const activeResources = resources.filter(isResourceAssignable);
   const projects = useRMS((s) => s.projects);
   const projectAssignments = useRMS((s) => s.projectAssignments);
   
@@ -186,7 +187,7 @@ function AdminReportsAuditPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Developers</SelectItem>
-              {resources.map((r) => (
+              {activeResources.map((r) => (
                 <SelectItem key={r.id} value={r.id}>{r.fullName}</SelectItem>
               ))}
             </SelectContent>

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 import { PageCard } from "@/components/layout/AppShell";
 import {
   AreaChart,
@@ -117,8 +118,9 @@ function AnalyticsPage() {
   const leaveStatus = countBy(leaves, (l) => l.status);
   const projectStat = countBy(projects, (p) => p.status);
 
-  // Job role breakdown
-  const roleMap = resources.reduce<Record<string, number>>((acc, r) => {
+  // Job role breakdown (Active & Approved resources only)
+  const activeResources = resources.filter(isResourceAssignable);
+  const roleMap = activeResources.reduce<Record<string, number>>((acc, r) => {
     acc[r.jobTitle] = (acc[r.jobTitle] ?? 0) + 1;
     return acc;
   }, {});
@@ -163,25 +165,25 @@ function AnalyticsPage() {
             label: "Total Resources",
             value: resources.length,
             color: TEAL,
-            sub: `${resources.filter((r) => r.status === "active").length} active`,
+            sub: "All tracked profiles",
           },
           {
-            label: "Total Tasks",
-            value: tasks.length,
-            color: "#3b82f6",
-            sub: `${tasks.filter((t) => t.status === "completed").length} done`,
+            label: "Assignable Resources",
+            value: resources.filter(isResourceAssignable).length,
+            color: "#10b981",
+            sub: "Active and compliant",
           },
           {
-            label: "Leave Requests",
-            value: leaves.length,
+            label: "Pending Resources",
+            value: resources.filter(r => r.status === "pending" || r.approvalStatus === "pending").length,
             color: "#f59e0b",
-            sub: `${leaves.filter((l) => l.status === "pending").length} pending`,
+            sub: "Awaiting approval/onboarding",
           },
           {
-            label: "Total Projects",
-            value: projects.length,
-            color: "#8b5cf6",
-            sub: `${projects.filter((p) => p.status === "active").length} active`,
+            label: "Rejected Resources",
+            value: resources.filter(r => r.approvalStatus === "rejected").length,
+            color: "#ef4444",
+            sub: "Onboarding rejected",
           },
         ].map((k) => (
           <div

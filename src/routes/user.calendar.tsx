@@ -20,9 +20,12 @@ function UserCalendarPage() {
   const resourceId = useAuth((s) => s.resourceId) ?? "177";
 
   // Load from store
-  const projectTasks = useRMS((s) => s.projectTasks.filter(pt => pt.resourceId === resourceId));
-  const scheduleEntries = useRMS((s) => s.taskScheduleEntries.filter(se => se.resourceId === resourceId));
+  const allProjectTasks = useRMS((s) => s.projectTasks);
+  const allScheduleEntries = useRMS((s) => s.taskScheduleEntries);
   const projects = useRMS((s) => s.projects);
+
+  const projectTasks = allProjectTasks.filter(pt => pt.resourceId === resourceId);
+  const scheduleEntries = allScheduleEntries.filter(se => se.resourceId === resourceId);
 
   // Focus week start date (aligns to Monday of selected week)
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {

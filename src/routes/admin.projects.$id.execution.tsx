@@ -27,12 +27,18 @@ function ProjectExecutionDashboard() {
 
   // Load state from useRMS
   const project = useRMS((s) => s.projects.find((p) => p.id === id));
-  const tasks = useRMS((s) => s.projectTasks.filter((t) => t.projectId === id));
-  const requirements = useRMS((s) => s.projectRequirements.filter((r) => r.projectId === id));
-  const assignments = useRMS((s) => s.projectAssignments.filter((a) => a.projectId === id));
-  const activityLogs = useRMS((s) => s.taskActivityLogs.filter((l) => tasks.some(t => t.id === l.taskId)));
-  const timeLogs = useRMS((s) => s.taskTimeLogs.filter((l) => tasks.some(t => t.id === l.taskId)));
+  const allProjectTasks = useRMS((s) => s.projectTasks);
+  const allProjectRequirements = useRMS((s) => s.projectRequirements);
+  const allProjectAssignments = useRMS((s) => s.projectAssignments);
+  const allTaskActivityLogs = useRMS((s) => s.taskActivityLogs);
+  const allTaskTimeLogs = useRMS((s) => s.taskTimeLogs);
   const resources = useRMS((s) => s.resources);
+
+  const tasks = allProjectTasks.filter((t) => t.projectId === id);
+  const requirements = allProjectRequirements.filter((r) => r.projectId === id);
+  const assignments = allProjectAssignments.filter((a) => a.projectId === id);
+  const activityLogs = allTaskActivityLogs.filter((l) => tasks.some(t => t.id === l.taskId));
+  const timeLogs = allTaskTimeLogs.filter((l) => tasks.some(t => t.id === l.taskId));
 
   if (!project) {
     return (
@@ -301,7 +307,7 @@ function ProjectExecutionDashboard() {
                   const resObj = resources.find(r => r.id === log.resourceId);
                   
                   let actionColor = "text-slate-500 bg-slate-50";
-                  let actionLabel = log.action;
+                  let actionLabel: string = log.action;
                   if (log.action === "started") {
                     actionColor = "text-sky-600 bg-sky-50 border border-sky-100";
                     actionLabel = "Started";

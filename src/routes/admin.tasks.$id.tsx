@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useRMS } from "@/lib/store";
 import { PageCard } from "@/components/layout/AppShell";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/tasks/$id")({ component: ViewTask });
 
@@ -113,7 +114,7 @@ function ViewTask() {
             className="border border-black rounded px-3 py-1.5 text-sm w-full max-w-[380px] bg-white focus:outline-none focus:ring-1 focus:ring-teal-500"
           >
             <option value="">Select Resource</option>
-            {resources.map((r) => (
+            {resources.filter((r) => isResourceAssignable(r) || r.fullName === task?.resourceName).map((r) => (
               <option key={r.id} value={r.fullName}>
                 {r.fullName}
               </option>

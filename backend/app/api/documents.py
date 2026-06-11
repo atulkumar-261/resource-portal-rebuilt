@@ -17,7 +17,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")
-def upload_document(
+async def upload_document(
     file: UploadFile = File(...),
     document_type: str = Form(...),
     resource_id: uuid.UUID = Form(...),
@@ -30,10 +30,10 @@ def upload_document(
     if current_user.role.name not in ["super_admin", "admin"] and resource_id != current_user.resource_id:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    from backend.app.core.file_security import validate_and_sanitize_file, check_file_size, verify_path_traversal
+    from backend.app.core.file_security import validate_and_sanitize_file, validate_upload_file, verify_path_traversal, ALLOWED_DOCUMENT_TYPES
 
     # Apply file security validations
-    check_file_size(file)
+    await validate_upload_file(file, ALLOWED_DOCUMENT_TYPES)
     sanitized_filename = validate_and_sanitize_file(file)
 
     # Verify resource exists and isn't deleted
@@ -56,20 +56,20 @@ def upload_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
         
-    # Create database record
+    from backend.app.services.transaction_service import transactional
+
     try:
-        doc = ResourceDocument(
-            resource_id=resource_id,
-            document_type=document_type,
-            file_name=sanitized_filename,
-            file_path=str(file_path.as_posix()), # Store relative posix path
-            uploaded_by=current_user.id
-        )
-        db.add(doc)
-        db.commit()
-        db.refresh(doc)
+        with transactional(db):
+            doc = ResourceDocument(
+                resource_id=resource_id,
+                document_type=document_type,
+                file_name=sanitized_filename,
+                file_path=str(file_path.as_posix()), # Store relative posix path
+                uploaded_by=current_user.id
+            )
+            db.add(doc)
+            db.flush()
     except Exception as e:
-        db.rollback()
         # Clean up the saved file
         if file_path.exists():
             try:
@@ -77,6 +77,8 @@ def upload_document(
             except Exception:
                 pass
         raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
+    
+    db.refresh(doc)
     
     return {
         "id": doc.id,
@@ -140,12 +142,9 @@ def delete_document(
     except Exception as e:
         print(f"Failed to delete file {doc.file_path}: {e}")
         
-    # Remove from db
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         db.delete(doc)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
     
     return {"status": "success", "message": "Document deleted successfully"}

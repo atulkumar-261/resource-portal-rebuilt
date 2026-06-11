@@ -4,8 +4,10 @@ import { DataTable } from "@/components/shared/DataTable";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useRMS } from "@/lib/store";
+import { downloadCsv } from "@/lib/utils/csv";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Leave } from "@/lib/types";
+import { isResourceAssignable } from "@/lib/types";
 import { useState } from "react";
 import { Search, User } from "lucide-react";
 
@@ -117,7 +119,7 @@ function LeavesPage() {
   ];
 
   // Sidebar active resources filter
-  const activeResources = resources.filter((r) => r.status === "active");
+  const activeResources = resources.filter(isResourceAssignable);
   const filteredActive = activeResources.filter(
     (r) =>
       r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -145,20 +147,18 @@ function LeavesPage() {
       l.status,
     ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
+    const resourceSuffix =
+      selectedResource === "ALL"
+        ? "ALL"
+        : selectedResource
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "_");
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `leaves_report_${selectedResource.replace(/\s+/g, "_")}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv(
+      `leaves_report_${resourceSuffix}`,
+      headers,
+      rows
+    );
   };
 
   return (
@@ -176,7 +176,7 @@ function LeavesPage() {
                 className="border border-black rounded px-3 py-1 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-teal-500"
               >
                 <option value="ALL">ALL</option>
-                {resources.map((r) => (
+                {activeResources.map((r) => (
                   <option key={r.id} value={r.fullName}>
                     {r.fullName}
                   </option>

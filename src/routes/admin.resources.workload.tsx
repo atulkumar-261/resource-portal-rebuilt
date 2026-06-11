@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
 import { useRMS, calculateResourceCapacity } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 import { useState } from "react";
 import { 
   Users, 
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/admin/resources/workload")({
 
 function ResourceWorkloadHeatmap() {
   const allResources = useRMS((s) => s.resources);
-  const resources = allResources.filter(r => r.status === 'active');
+  const resources = allResources.filter(isResourceAssignable);
   const projectTasks = useRMS((s) => s.projectTasks);
   const taskScheduleEntries = useRMS((s) => s.taskScheduleEntries);
 
@@ -73,7 +74,7 @@ function ResourceWorkloadHeatmap() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-slate-200 p-5 rounded-lg shadow-sm">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-teal-600" /> Active Staff Loaded
+            <Users className="w-4 h-4 text-teal-600" /> Assignable Staff Loaded
           </span>
           <div className="text-2xl font-extrabold text-teal-900 mt-2">{resources.length} resources</div>
           <p className="text-[11px] text-slate-400 mt-1">Currently tracked employee profiles</p>

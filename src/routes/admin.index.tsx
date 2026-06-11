@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 import { Search, MapPin, FileWarning, Plane, ShieldAlert, User, Shield, CheckCircle2, AlertTriangle, TrendingUp } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchResources, approveResourceOnboarding, fetchResourceWorkload, type ResourceResponse } from "@/lib/api/resources";
+import { fetchResources, approveResourceOnboarding, fetchResourceWorkload, type ResourceResponse, fetchAddressChanges } from "@/lib/api/resources";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
@@ -47,19 +48,23 @@ function AdminDashboard() {
     }))
     .sort((a, b) => a.daysLeft - b.daysLeft);
 
-  // 3. Address Change Log (Derived from actual backend resources)
-  const addressChanges = resources
-    .filter((r) => r.address)
+  // 3. Address Change Log (Fetched from backend database audit logs)
+  const addressChangesQuery = useQuery({
+    queryKey: ["address-changes"],
+    queryFn: fetchAddressChanges,
+  });
+
+  const addressChanges = (addressChangesQuery.data || [])
     .slice(0, 5)
-    .map((r) => ({
-      resourceId: r.id,
-      resourceName: r.fullName,
-      currentAddress: r.address,
-      oldAddress: "—", // No historical tracking in database
+    .map((log) => ({
+      resourceId: log.resource_id,
+      resourceName: log.resource_name,
+      currentAddress: log.current_address,
+      oldAddress: log.old_address,
     }));
 
   // 4. Sidebar: Active Resources (searchable)
-  const activeResources = resources.filter((r) => r.status === "active");
+  const activeResources = resources.filter(isResourceAssignable);
 
   const filteredActive = activeResources.filter((r) => {
     const query = searchQuery.toLowerCase();

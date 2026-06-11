@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { downloadCsv } from "@/lib/utils/csv";
 import { PageCard } from "@/components/layout/AppShell";
 import { ArrowLeft } from "lucide-react";
 
@@ -27,19 +28,7 @@ function OtherDocumentsRecordsPage() {
     const headers = ["Document Name", "Type", "Uploaded Date"];
     const rows = filtered.map((d) => [d.name, d.type, d.date]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "other_documents_records.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv("other_documents", headers, rows);
   };
 
   return (

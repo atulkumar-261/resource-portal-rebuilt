@@ -275,10 +275,16 @@ export const useRMS = create<RMSState>((set, get) => ({
           emergencyEmail: r.emergency_contact_email ?? "",
           emergencyAddress: r.emergency_contact_address ?? "",
           status: (r.status || "active") as any,
+          approvalStatus: r.approval_status ?? "pending",
+          onboardingStatus: r.onboarding_status ?? "pending",
           avatarUrl: r.avatar_url ?? undefined,
           weeklyAllowedHours: r.weekly_allowed_hours ?? 35,
           performanceNotes: r.performance_notes ?? "",
           otherInfo: r.other_info ?? "",
+          profileCompletionPercentage: r.profile_completion_percentage ?? 0,
+          userIsActive: r.user_is_active ?? false,
+          isDeleted: r.is_deleted ?? false,
+          hasRequiredDocuments: r.has_required_documents ?? false,
         }));
 
         const clients: Client[] = clientList.map((c: any) => ({
@@ -1331,8 +1337,8 @@ export const useRMS = create<RMSState>((set, get) => ({
         reportsSubmitted: reports.length,
         hoursLogged,
         tasksCompleted: completed,
-        currentProgress: 65.0,
-        reportingStreak: 4,
+        currentProgress: tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0,
+        reportingStreak: reports.length > 0 ? reports.length : 0,
         efficiencyMetrics: {
           activeDevelopers: 2,
           tasksTotal: tasks.length
@@ -1343,17 +1349,52 @@ export const useRMS = create<RMSState>((set, get) => ({
       const hoursLogged = reports.reduce((sum, r) => sum + r.hoursWorked, 0);
       const tasks = get().projectTasks.filter(t => t.resourceId === id);
       const completed = tasks.filter(t => t.status === "completed").length;
+      const totalFlags = reports.reduce((sum, r) => sum + (r.flags?.length || 0), 0);
+
+      // Calculate actual streak from local reports
+      let streak = 0;
+      if (reports.length > 0) {
+        const uniqueDates = [...new Set(reports.map(r => r.workDate))].sort().reverse();
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const threeDaysAgo = new Date(today);
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+        const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
+
+        if (uniqueDates[0] >= threeDaysAgoStr) {
+          let checkDate = new Date(uniqueDates[0]);
+          let idx = 0;
+          while (idx < uniqueDates.length) {
+            const checkStr = checkDate.toISOString().split('T')[0];
+            if (uniqueDates[idx] === checkStr) {
+              streak++;
+              idx++;
+              checkDate.setDate(checkDate.getDate() - 1);
+              // Skip weekends
+              while (checkDate.getDay() === 0 || checkDate.getDay() === 6) {
+                checkDate.setDate(checkDate.getDate() - 1);
+              }
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      // Calculate actual efficiency: 100% - (flags * 10%), min 20%
+      const efficiencyScore = Math.max(20, Math.min(100, 100 - (totalFlags * 10)));
+
       return {
         id,
         name: get().resources.find(r => r.id === id)?.fullName || "Developer",
         reportsSubmitted: reports.length,
         hoursLogged,
         tasksCompleted: completed,
-        currentProgress: 75.0,
-        reportingStreak: 5,
+        currentProgress: reports.length > 0 ? 75.0 : 0,
+        reportingStreak: streak,
         efficiencyMetrics: {
-          efficiencyScore: 85,
-          auditsFailed: reports.reduce((sum, r) => sum + (r.flags?.length || 0), 0)
+          efficiencyScore,
+          auditsFailed: totalFlags
         }
       };
     }

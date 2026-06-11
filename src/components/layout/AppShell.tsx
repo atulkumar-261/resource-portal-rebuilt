@@ -41,16 +41,20 @@ const userNav = [
 ];
 
 export function AppShell({ role, children }: { role: "admin" | "user"; children: ReactNode }) {
-  const { role: authRole, userName, logout, onboardingStatus, token } = useAuth();
+  const { role: authRole, userName, logout, onboardingStatus, token, resourceId } = useAuth();
   const initStore = useRMS((s) => s.initStore);
+  const resource = useRMS((s) => s.resources.find((r) => r.id === resourceId));
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const nav = role === "admin" ? (authRole === "super_admin" ? [...adminNav, ...superAdminNav] : adminNav) : userNav;
   const [menuOpen, setMenuOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  // Route lock: if resource user has pending onboarding, force them to profile
-  const isOnboardingLocked = role === "user" && onboardingStatus === "pending";
+  // Route lock: if resource user has pending onboarding or is unapproved, force them to profile
+  const isOnboardingLocked = role === "user" && (
+    onboardingStatus === "pending" || 
+    (resource && (resource.status !== "active" || resource.approvalStatus !== "approved"))
+  );
 
   useEffect(() => {
     if (token) {

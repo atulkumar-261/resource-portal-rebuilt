@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from backend.app.core.config import get_db_session
-from backend.app.models.database import Project, Client, ProjectStatus, ProjectAssignment, ProjectRequirement, User
+from backend.app.models.database import Project, Client, ProjectStatus, ProjectAssignment, ProjectRequirement, User, Resource
+from backend.app.services.resource_eligibility import validate_resource_assignable
 from backend.app.schemas.ai import (
     ProjectAnalysisInput,
     ProjectAnalysisResponse,
@@ -121,6 +122,15 @@ def assign_resource(id: UUID, request: AssignmentRequest, db: Session = Depends(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Module/Requirement not found for this project."
         )
+
+    # Verify resource is eligible
+    resource = db.query(Resource).filter(Resource.id == request.resource_id, Resource.is_deleted == False).first()
+    if not resource:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Resource not found or deleted."
+        )
+    validate_resource_assignable(resource)
 
     # Check if this assignment already exists to avoid duplicates
     existing = db.query(ProjectAssignment).filter(

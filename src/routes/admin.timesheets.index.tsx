@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
 import { Search, User } from "lucide-react";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/timesheets/")({
   component: AdminTimesheetsIndex,
@@ -24,7 +25,7 @@ function AdminTimesheetsIndex() {
   });
 
   // Sidebar active resources filter
-  const activeResources = resources.filter((r) => r.status === "active");
+  const activeResources = resources.filter(isResourceAssignable);
   const filteredActive = activeResources.filter(
     (r) =>
       r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -47,7 +48,7 @@ function AdminTimesheetsIndex() {
               className="border border-slate-300 rounded px-3 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-teal-500 min-w-[150px]"
             >
               <option value="ALL">ALL</option>
-              {resources.map((r) => (
+              {activeResources.map((r) => (
                 <option key={r.id} value={r.fullName}>
                   {r.fullName}
                 </option>

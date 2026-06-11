@@ -43,3 +43,8 @@ graphify-out/
 # Environment files
 .env
 .env.*
+
+# Local test uploads & binaries
+backend/uploads/
+backend.pdf
+

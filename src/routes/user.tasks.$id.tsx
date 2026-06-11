@@ -40,9 +40,12 @@ function UsertasksidPage() {
   const updateProjectTaskStatus = useRMS((s) => s.updateProjectTaskStatus);
   const logTimeForTask = useRMS((s) => s.logTimeForTask);
   
-  const timeLogs = useRMS((s) => s.taskTimeLogs.filter((l) => l.taskId === id));
-  const activityLogs = useRMS((s) => s.taskActivityLogs.filter((l) => l.taskId === id));
+  const allTimeLogs = useRMS((s) => s.taskTimeLogs);
+  const allActivityLogs = useRMS((s) => s.taskActivityLogs);
   const projects = useRMS((s) => s.projects);
+
+  const timeLogs = allTimeLogs.filter((l) => l.taskId === id);
+  const activityLogs = allActivityLogs.filter((l) => l.taskId === id);
 
   // Status & notes states for legacy task
   const [legacyStatus, setLegacyStatus] = useState(legacyTask?.status ?? "pending");
@@ -134,6 +137,7 @@ function UsertasksidPage() {
   }
 
   // ── RENDER 2: MILESTONE 2 PROJECT TASK EXECUTION SCREEN ──
+  if (!projectTask) return null;
   const projObj = projects.find(p => p.id === projectTask.projectId);
 
   const handleStatusTransition = async (newStatus: "in_progress" | "paused" | "completed") => {

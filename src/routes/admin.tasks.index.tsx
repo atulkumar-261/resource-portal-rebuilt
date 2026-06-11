@@ -11,17 +11,20 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useRMS } from "@/lib/store";
+import { downloadCsv } from "@/lib/utils/csv";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Trash2, Plus, Download } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Task } from "@/lib/types";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/tasks/")({ component: TasksPage });
 
 function TasksPage() {
   const tasks = useRMS((s) => s.tasks);
   const resources = useRMS((s) => s.resources);
+  const activeResources = resources.filter(isResourceAssignable);
   const del = useRMS((s) => s.deleteTask);
   const router = useRouter();
   const [resourceFilter, setResourceFilter] = useState<string>("ALL");
@@ -30,15 +33,14 @@ function TasksPage() {
 
   const downloadCSV = () => {
     const headers = ["Subject", "Resource", "Project", "Start Date", "Status"];
-    const rows = filtered.map((t) => [t.subject, t.resourceName, t.project, t.startDate, t.status]);
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tasks.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = filtered.map((t) => [
+      t.subject || "",
+      t.resourceName || "",
+      t.project || "",
+      t.startDate || "",
+      t.status || ""
+    ]);
+    downloadCsv("tasks", headers, rows);
   };
 
   const columns: ColumnDef<Task, any>[] = [
@@ -99,7 +101,7 @@ function TasksPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">ALL</SelectItem>
-              {resources.map((r) => (
+              {activeResources.map((r) => (
                 <SelectItem key={r.id} value={r.id}>
                   {r.fullName}
                 </SelectItem>

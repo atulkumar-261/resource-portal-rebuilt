@@ -1,26 +1,46 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from backend.app.models.database import User, Role, Resource
+from backend.app.models.database import User, Role, Resource, LoginActivity
 from backend.app.schemas.auth import LoginRequestSchema, TokenResponseSchema, UserLoginResponse
 from backend.app.core.config import get_db_session
 from backend.app.core.security import create_access_token, hash_password, require_current_user
+from backend.app.services.transaction_service import transactional
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/login", response_model=TokenResponseSchema)
-def login(request: LoginRequestSchema, db: Session = Depends(get_db_session)):
+def login(request: LoginRequestSchema, req: Request, db: Session = Depends(get_db_session)):
+    ip_address = req.client.host if req.client else None
+    user_agent = req.headers.get("user-agent")
+
     # 1. Fetch user by username
     user = db.query(User).filter(User.username == request.username).first()
     if not user or user.password_hash != hash_password(request.password):
+        with transactional(db):
+            activity = LoginActivity(
+                username=request.username,
+                status="failed",
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            db.add(activity)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password."
         )
 
     if not user.is_active:
+        with transactional(db):
+            activity = LoginActivity(
+                username=request.username,
+                status="failed",
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            db.add(activity)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is suspended."
@@ -30,9 +50,18 @@ def login(request: LoginRequestSchema, db: Session = Depends(get_db_session)):
     role = db.query(Role).filter(Role.id == user.role_id).first()
     role_name = role.name if role else "user"
 
-    user.last_login = datetime.utcnow()
-    db.add(user)
-    db.commit()
+    with transactional(db):
+        user.last_login = datetime.utcnow()
+        db.add(user)
+
+        activity = LoginActivity(
+            username=request.username,
+            status="success",
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        db.add(activity)
+
     db.refresh(user)
 
     token = create_access_token(user)

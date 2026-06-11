@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user
-from backend.app.models.database import Payslip, DocumentAttachment, Resource, AuditLog, User
+from backend.app.models.database import Payslip, DocumentAttachment, Resource, User
 from backend.app.schemas.payslips import PayslipResponse
 
 router = APIRouter(prefix="/payslips", tags=["Payslips"])
@@ -29,6 +29,9 @@ def _snapshot(payslip: Payslip) -> Dict[str, Any]:
         "file_attachment_id": str(payslip.file_attachment_id) if payslip.file_attachment_id else None,
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -38,25 +41,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    savepoint = db.begin_nested()
-    try:
-        db.add(
-            AuditLog(
-                module="payroll",
-                action=action,
-                table_name="payslips",
-                record_id=payslip_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        savepoint.rollback()
-        import logging
-        logging.getLogger(__name__).exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="payroll",
+        action=action,
+        table_name="payslips",
+        record_id=payslip_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 def _payslip_response(db: Session, payslip: Payslip) -> PayslipResponse:
     # Resolve resource name
@@ -90,7 +85,7 @@ def get_payslips(
     return [_payslip_response(db, p) for p in payslips]
 
 @router.post("", response_model=PayslipResponse, status_code=status.HTTP_201_CREATED)
-def create_payslip(
+async def create_payslip(
     month: str = Form(...),
     days: int = Form(...),
     notes: Optional[str] = Form(None),
@@ -105,10 +100,10 @@ def create_payslip(
     if not res:
         raise HTTPException(status_code=400, detail="Resource not found or deleted.")
 
-    from backend.app.core.file_security import validate_and_sanitize_file, check_file_size, verify_path_traversal
+    from backend.app.core.file_security import validate_and_sanitize_file, validate_upload_file, verify_path_traversal, ALLOWED_DOCUMENT_TYPES
 
     # Apply file security validations
-    check_file_size(file)
+    await validate_upload_file(file, ALLOWED_DOCUMENT_TYPES)
     sanitized_filename = validate_and_sanitize_file(file)
 
     # Save uploaded file
@@ -127,48 +122,49 @@ def create_payslip(
 
     file_size = file_path.stat().st_size
 
+    from backend.app.services.transaction_service import transactional
+
     try:
-        # Create document attachment record
-        attachment = DocumentAttachment(
-            filename=sanitized_filename,
-            storage_key=storage_key,
-            file_size=file_size,
-            mime_type=file.content_type or "application/pdf",
-            uploaded_by=current_user.id,
-            entity_type="payslip"
-        )
-        db.add(attachment)
-        db.flush()
+        with transactional(db):
+            # Create document attachment record
+            attachment = DocumentAttachment(
+                filename=sanitized_filename,
+                storage_key=storage_key,
+                file_size=file_size,
+                mime_type=file.content_type or "application/pdf",
+                uploaded_by=current_user.id,
+                entity_type="payslip"
+            )
+            db.add(attachment)
+            db.flush()
 
-        # Create payslip record
-        payslip = Payslip(
-            resource_id=resource_id,
-            month=month,
-            days=days,
-            notes=notes,
-            amount=amount,
-            file_attachment_id=attachment.id,
-            is_deleted=False
-        )
-        db.add(payslip)
-        db.flush()
+            # Create payslip record
+            payslip = Payslip(
+                resource_id=resource_id,
+                month=month,
+                days=days,
+                notes=notes,
+                amount=amount,
+                file_attachment_id=attachment.id,
+                is_deleted=False
+            )
+            db.add(payslip)
+            db.flush()
 
-        # Link the attachment to the payslip entity ID
-        attachment.entity_id = payslip.id
-        db.add(attachment)
-        db.flush()
+            # Link the attachment to the payslip entity ID
+            attachment.entity_id = payslip.id
+            db.add(attachment)
+            db.flush()
 
-        _audit(
-            db,
-            current_user,
-            payslip.id,
-            "payslip_created",
-            new_value=_snapshot(payslip),
-            changed_fields={"created": True}
-        )
-        db.commit()
+            _audit(
+                db,
+                current_user,
+                payslip.id,
+                "payslip_created",
+                new_value=_snapshot(payslip),
+                changed_fields={"created": True}
+            )
     except Exception as e:
-        db.rollback()
         # Clean up file on failure
         if file_path.exists():
             try:
@@ -195,7 +191,9 @@ def delete_payslip(
     payslip.deleted_at = datetime.utcnow()
     payslip.deleted_by = current_user.id
 
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         db.add(payslip)
         
         # Delete attachment if any
@@ -220,9 +218,5 @@ def delete_payslip(
             old_value=old,
             changed_fields={"deleted": True}
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
 
     return {"status": "success", "message": "Payslip soft-deleted successfully."}

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/reports/visa-expiry")({
   component: AdminreportsvisaexpiryPage,
@@ -8,7 +9,7 @@ export const Route = createFileRoute("/admin/reports/visa-expiry")({
 
 function AdminreportsvisaexpiryPage() {
   const allResources = useRMS((s) => s.resources);
-  const resources = allResources.filter((r) => r.visaExpiry);
+  const resources = allResources.filter((r) => isResourceAssignable(r) && r.visaExpiry);
   return (
     <PageCard title="Visa Expiry Report">
       <table className="w-full text-sm border border-slate-200">

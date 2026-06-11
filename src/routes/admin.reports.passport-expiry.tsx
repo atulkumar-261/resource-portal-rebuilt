@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageCard } from "@/components/layout/AppShell";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/reports/passport-expiry")({
   component: AdminreportspassportexpiryPage,
 });
 
 function AdminreportspassportexpiryPage() {
-  const resources = useRMS((s) => s.resources);
+  const resources = useRMS((s) => s.resources).filter((r) => isResourceAssignable(r) && r.passportExpiry);
   return (
     <PageCard title="Passport Expiry Report">
       <table className="w-full text-sm border border-slate-200">

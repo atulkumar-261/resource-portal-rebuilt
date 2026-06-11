@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { downloadCsv } from "@/lib/utils/csv";
 import { PageCard } from "@/components/layout/AppShell";
 import { ArrowLeft } from "lucide-react";
 
@@ -76,19 +77,7 @@ function PeriodicTimesheetsPage() {
       ];
     });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "periodic_timesheets.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv("periodic_timesheets", headers, rows);
   };
 
   return (

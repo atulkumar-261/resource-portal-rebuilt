@@ -12,7 +12,6 @@ from backend.app.models.database import (
     Project,
     Client,
     ProjectStatus,
-    AuditLog,
     User,
     ProjectRequirement,
     ProjectAssignment,
@@ -48,6 +47,9 @@ def _snapshot(project: Project) -> Dict[str, Any]:
         "description": project.description,
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -57,27 +59,32 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    db.add(
-        AuditLog(
-            module="projects",
-            action=action,
-            table_name="projects",
-            record_id=project_id,
-            old_value=old_value,
-            new_value=new_value,
-            changed_fields=changed_fields,
-            user_id=actor.id,
-        )
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="projects",
+        action=action,
+        table_name="projects",
+        record_id=project_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
     )
 
 def _project_response(db: Session, project: Project) -> ProjectResponse:
-    # Resolve client name
-    client = db.query(Client).filter(Client.id == project.client_id).first()
-    client_name = client.name if client else "Unknown Client"
+    # Resolve client name using preloaded relationship, fallback to query if not loaded
+    if project.client:
+        client_name = project.client.name
+    else:
+        client = db.query(Client).filter(Client.id == project.client_id).first()
+        client_name = client.name if client else "Unknown Client"
     
-    # Resolve status name
-    status_rec = db.query(ProjectStatus).filter(ProjectStatus.id == project.status_id).first()
-    status_name = status_rec.name if status_rec else "active"
+    # Resolve status name using preloaded relationship, fallback to query if not loaded
+    if project.status:
+        status_name = project.status.name
+    else:
+        status_rec = db.query(ProjectStatus).filter(ProjectStatus.id == project.status_id).first()
+        status_name = status_rec.name if status_rec else "active"
 
     return ProjectResponse(
         id=project.id,
@@ -90,19 +97,26 @@ def _project_response(db: Session, project: Project) -> ProjectResponse:
         description=project.description
     )
 
+
 @router.get("", response_model=List[ProjectResponse])
 def get_projects(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_current_user),
 ):
+    from sqlalchemy.orm import joinedload
+    query = db.query(Project).options(
+        joinedload(Project.client),
+        joinedload(Project.status)
+    ).filter(Project.is_deleted == False)
+
     if current_user.role.name == "resource":
-        projects = db.query(Project).join(ProjectAssignment).filter(
-            ProjectAssignment.resource_id == current_user.resource_id,
-            Project.is_deleted == False
+        projects = query.join(ProjectAssignment).filter(
+            ProjectAssignment.resource_id == current_user.resource_id
         ).all()
     else:
-        projects = db.query(Project).filter(Project.is_deleted == False).all()
+        projects = query.all()
     return [_project_response(db, p) for p in projects]
+
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 def get_project(
@@ -110,7 +124,11 @@ def get_project(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_current_user),
 ):
-    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    from sqlalchemy.orm import joinedload
+    project = db.query(Project).options(
+        joinedload(Project.client),
+        joinedload(Project.status)
+    ).filter(Project.id == project_id, Project.is_deleted == False).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found.")
     
@@ -150,7 +168,9 @@ def create_project(
     start_date_obj = parse_date(request.start_date)
     end_date_obj = parse_date(request.end_date) if request.end_date else None
 
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         project = Project(
             name=request.name,
             client_id=client.id,
@@ -171,10 +191,6 @@ def create_project(
             new_value=_snapshot(project),
             changed_fields={"created": True}
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
 
     db.refresh(project)
     return _project_response(db, project)
@@ -242,7 +258,9 @@ def update_project(
     if not changed:
         return _project_response(db, project)
 
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         db.add(project)
         db.flush()
 
@@ -255,10 +273,6 @@ def update_project(
             new_value=_snapshot(project),
             changed_fields=changed
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
 
     db.refresh(project)
     return _project_response(db, project)
@@ -274,7 +288,9 @@ def delete_project(
         raise HTTPException(status_code=404, detail="Project not found.")
 
     old = _snapshot(project)
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         project.is_deleted = True
         project.deleted_at = datetime.utcnow()
         project.deleted_by = current_user.id
@@ -289,10 +305,6 @@ def delete_project(
             old_value=old,
             changed_fields={"deleted": True}
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
 
     return {"status": "success", "message": "Project soft-deleted successfully."}
 
@@ -336,7 +348,9 @@ async def generate_tasks_for_project(id: UUID, db: Session = Depends(get_db_sess
     # Sort tasks topologically
     sorted_tasks = DependencyAnalyzer.topological_sort(planned.model_dump()["tasks"])
 
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         # Clear previous tasks/dependencies/schedule entries for this project to start fresh
         db.query(ProjectTask).filter(ProjectTask.project_id == id).delete()
         db.flush()
@@ -411,11 +425,6 @@ async def generate_tasks_for_project(id: UUID, db: Session = Depends(get_db_sess
 
         # Re-run DailyTaskScheduler to assign schedule dates and entries
         DailyTaskScheduler.schedule_tasks(db, str(id), project.start_date, saved_tasks_list)
-
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise e
 
     return {"status": "success", "message": "Tasks planned and calendar scheduled successfully."}
 

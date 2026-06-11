@@ -5,6 +5,8 @@ import { X, AlertTriangle, CheckCircle, Loader2, UploadCloud } from "lucide-reac
 import { fetchSelfProfileCompletion, updateSelfProfile, changePassword, uploadResourceDocument, fetchResourceDocuments, deleteResourceDocument, type ProfileCompletionResponse, type ResourceDocument } from "@/lib/api/resources";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getApiBaseUrl } from "@/lib/api/client";
+import { validateFileSize, validateImageFile } from "@/lib/utils/uploadValidation";
 
 export const Route = createFileRoute("/user/profile")({ component: MyProfile });
 
@@ -53,25 +55,22 @@ function MyProfile() {
     enabled: !!resource?.id,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: ({ type, file }: { type: string; file: File }) => uploadResourceDocument(resource!.id, type, file),
-    onSuccess: () => {
-      toast.success("Document uploaded successfully");
-      queryClient.invalidateQueries({ queryKey: ["resource-documents", resource?.id] });
-    },
-    onError: (err: any) => toast.error(err.message || "Failed to upload document"),
-  });
+  const isDocType = (docType: string | undefined | null, target: string) => {
+    if (!docType) return false;
+    const norm = docType.toLowerCase().replace(/_/g, " ").trim();
+    if (target === "passport") {
+      return norm === "passport" || norm === "passport copy";
+    }
+    if (target === "visa") {
+      return norm === "visa" || norm === "visa copy";
+    }
+    if (target === "holiday sheet") {
+      return norm === "holiday sheet" || norm === "holiday_sheet" || norm === "holdiay sheet";
+    }
+    return norm === target;
+  };
 
-  const deleteDocMutation = useMutation({
-    mutationFn: (id: string) => deleteResourceDocument(id),
-    onSuccess: () => {
-      toast.success("Document deleted");
-      queryClient.invalidateQueries({ queryKey: ["resource-documents", resource?.id] });
-    },
-    onError: (err: any) => toast.error(err.message || "Failed to delete document"),
-  });
-
-  useEffect(() => {
+  const loadCompletion = () => {
     fetchSelfProfileCompletion()
       .then((data) => {
         setCompletionData(data);
@@ -82,6 +81,30 @@ function MyProfile() {
       .catch(() => {
         // Backend unavailable — no banner shown
       });
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ type, file }: { type: string; file: File }) => uploadResourceDocument(resource!.id, type, file),
+    onSuccess: () => {
+      toast.success("Document uploaded successfully");
+      queryClient.invalidateQueries({ queryKey: ["resource-documents", resource?.id] });
+      loadCompletion();
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to upload document"),
+  });
+
+  const deleteDocMutation = useMutation({
+    mutationFn: (id: string) => deleteResourceDocument(id),
+    onSuccess: () => {
+      toast.success("Document deleted");
+      queryClient.invalidateQueries({ queryKey: ["resource-documents", resource?.id] });
+      loadCompletion();
+    },
+    onError: (err: any) => toast.error(err.message || "Failed to delete document"),
+  });
+
+  useEffect(() => {
+    loadCompletion();
   }, []);
 
   useEffect(() => {
@@ -116,6 +139,7 @@ function MyProfile() {
       
       setEmergencyEmail(resource.emergencyEmail || "");
       setEmergencyAddress(resource.emergencyAddress || "");
+      setAvatarUrl(resource.avatarUrl || "");
     }
   }, [resource]);
 
@@ -159,16 +183,53 @@ function MyProfile() {
 
   // File name states for UI display
   const [avatarFileName, setAvatarFileName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(resource?.avatarUrl || "");
+
+  // Image Compression Helper
+  const compressImage = (base64Str: string, maxDim = 400): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        } else {
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    });
+  };
 
   // File Upload Helper
   const handleFileUpload = (fieldName: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && fieldName === "avatarUrl") {
+      if (!validateImageFile(file)) return;
       setAvatarFileName(file.name);
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         if (typeof reader.result === "string") {
-          update(resource.id, { avatarUrl: reader.result });
+          const compressed = await compressImage(reader.result);
+          setAvatarUrl(compressed);
         }
       };
       reader.readAsDataURL(file);
@@ -213,6 +274,7 @@ function MyProfile() {
         bank_name: bankName || undefined,
         account_number: bankAccount || undefined,
         sort_code: sortCode || undefined,
+        avatar_url: avatarUrl || undefined,
       });
       // Update completion data from response
       setCompletionData({
@@ -225,16 +287,31 @@ function MyProfile() {
       if (result.onboarding_status) {
         setOnboardingStatus(result.onboarding_status);
       }
-      toast.success("Profile saved successfully!");
-    } catch {
-      // Fallback to mock store
+      // Update RMS store state to keep in sync
       update(resource.id, {
         fullName, jobTitle, email, performanceNotes: notes, skillset, otherInfo,
         bankAccount, sortCode, bankName, dob, passportNumber, passportExpiry,
         visaNumber, visaExpiry, niNumber, citizenOf, phone: fullPhone, address,
         emergencyName, emergencyPhone: fullEmergencyPhone, emergencyEmail, emergencyAddress,
+        avatarUrl,
       });
-      toast.success("Profile saved locally (backend unavailable).");
+      toast.success("Profile saved successfully!");
+    } catch (error: any) {
+      console.error("Profile save error:", error);
+      const isNetworkError = error?.message === "Failed to fetch" || !error?.message;
+      if (isNetworkError) {
+        // Fallback to mock store
+        update(resource.id, {
+          fullName, jobTitle, email, performanceNotes: notes, skillset, otherInfo,
+          bankAccount, sortCode, bankName, dob, passportNumber, passportExpiry,
+          visaNumber, visaExpiry, niNumber, citizenOf, phone: fullPhone, address,
+          emergencyName, emergencyPhone: fullEmergencyPhone, emergencyEmail, emergencyAddress,
+        });
+        toast.success("Profile saved locally (backend unavailable).");
+      } else {
+        // Real validation error returned by backend (e.g. duplicate NI number)
+        toast.error(error.message || "Failed to save profile.");
+      }
     } finally {
       setSaving(false);
     }
@@ -403,26 +480,24 @@ function MyProfile() {
                     className="hidden"
                   />
                 </label>
-                {(avatarFileName || (resource?.avatarUrl && !resource.avatarUrl.startsWith("data:"))) && (
-                  <span className="text-[11px] text-slate-300 truncate font-mono max-w-[200px]" title={avatarFileName || resource?.avatarUrl?.split("/").pop()}>
-                    {avatarFileName || resource?.avatarUrl?.split("/").pop()}
+                {(avatarFileName || (avatarUrl && !avatarUrl.startsWith("data:"))) && (
+                  <span className="text-[11px] text-slate-300 truncate font-mono max-w-[200px]" title={avatarFileName || avatarUrl.split("/").pop()}>
+                    {avatarFileName || avatarUrl.split("/").pop()}
                   </span>
                 )}
               </div>
-             </div>
-          </div>
+            </div>
 
-          {/* Column 2: Document previews / statuses (lg:col-span-4) */}
-          <div className="lg:col-span-4 space-y-4 text-xs lg:border-l lg:border-slate-500 lg:pl-6">
-            <div>
-              <span className="font-semibold text-slate-100 block mb-1 text-[11px]">
-                Current Profile Pic
-              </span>
+            {/* Current Profile Pic Preview */}
+            <div className="flex items-start">
+              <div className="w-36 shrink-0 pt-1">
+                <span className="font-normal text-slate-100">Current Profile Pic:</span>
+              </div>
               <div className="flex items-center gap-2">
                 <div className="w-20 h-24 border border-black bg-stone-200 flex items-center justify-center overflow-hidden relative">
-                  {resource?.avatarUrl ? (
+                  {avatarUrl ? (
                     <img
-                      src={resource.avatarUrl}
+                      src={avatarUrl}
                       alt="Profile"
                       className="w-full h-full object-cover"
                     />
@@ -430,10 +505,13 @@ function MyProfile() {
                     <span className="text-slate-500 text-[10px]">No Pic</span>
                   )}
                 </div>
-                {resource?.avatarUrl && (
+                {avatarUrl && (
                   <button
                     type="button"
-                    onClick={() => update(resource.id, { avatarUrl: "" })}
+                    onClick={() => {
+                      setAvatarUrl("");
+                      setAvatarFileName("");
+                    }}
                     className="bg-red-600 hover:bg-red-700 text-white rounded-full p-0.5"
                     title="Remove Profile Pic"
                   >
@@ -442,9 +520,88 @@ function MyProfile() {
                 )}
               </div>
             </div>
+          </div>
 
+          {/* Column 2: Document previews / statuses (lg:col-span-4) */}
+          <div className="lg:col-span-4 space-y-4 text-xs lg:border-l lg:border-slate-500 lg:pl-6">
             <div className="font-bold text-slate-100 block pt-1 border-b border-slate-600 pb-2 mb-4">
               Employee ID: {resource?.employeeId || "—"}
+            </div>
+
+            {/* Documents Section */}
+            <div className="pt-4 border-t border-slate-600 space-y-4">
+              <span className="font-bold text-slate-100 block mb-2 text-xs uppercase tracking-wide">
+                Uploaded Documents
+              </span>
+              
+              {/* Document rows */}
+              <div className="space-y-3">
+                {[
+                  { key: "cv", label: "CV" },
+                  { key: "passport", label: "Passport Copy" },
+                  { key: "visa", label: "Visa Copy" },
+                  { key: "holiday sheet", label: "Holiday Sheet" },
+                  { key: "other", label: "Other Documents" }
+                ].map((docType) => {
+                  const uploadedDoc = documents.find(
+                    (d) => isDocType(d.document_type, docType.key)
+                  );
+
+                  return (
+                    <div key={docType.key} className="bg-[#505050] border border-[#444] p-2.5 flex flex-col gap-1.5">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-slate-200">{docType.label}</span>
+                        {uploadedDoc ? (
+                          <span className="text-[10px] text-emerald-400 font-medium">Uploaded</span>
+                        ) : (
+                          <span className="text-[10px] text-amber-400 font-medium">Not Uploaded</span>
+                        )}
+                      </div>
+                      
+                      {uploadedDoc ? (
+                        <div className="flex items-center justify-between bg-[#404040] p-1.5 rounded-none border border-[#333]">
+                          <a
+                            href={`${getApiBaseUrl().replace("/api", "")}/uploads/${uploadedDoc.file_path.split("/").pop()}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-400 hover:text-teal-300 hover:underline font-medium truncate max-w-[180px]"
+                            title={uploadedDoc.file_name}
+                          >
+                            {uploadedDoc.file_name}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => deleteDocMutation.mutate(uploadedDoc.id)}
+                            disabled={deleteDocMutation.isPending}
+                            className="text-rose-400 hover:text-rose-300 ml-2 disabled:opacity-50"
+                            title="Delete Document"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <label className="bg-white hover:bg-slate-100 text-black px-2.5 py-1 border border-black rounded-none text-[10px] font-semibold cursor-pointer transition-colors flex items-center gap-1 shrink-0">
+                            <UploadCloud className="w-3.5 h-3.5" />
+                            Upload
+                            <input
+                              type="file"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (!validateFileSize(file)) return;
+                                  uploadMutation.mutate({ type: docType.key, file });
+                                }
+                              }}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

@@ -233,6 +233,16 @@ class Resource(Base):
     projects = relationship("Project", secondary=project_resources, back_populates="resources")
     tasks = relationship("Task", back_populates="resource", cascade="all, delete-orphan")
 
+    @property
+    def has_required_documents(self) -> bool:
+        uploaded_types = {
+            d.document_type.lower().strip()
+            for d in (self.documents or [])
+        }
+        required = {"cv", "passport", "visa"}
+        return required.issubset(uploaded_types)
+
+
 # ==========================================
 # RELATIONAL DETAILS
 # ==========================================
@@ -244,10 +254,14 @@ class ResourceAddress(Base):
     current_address = Column(Text, nullable=False)
     city_id = Column(UUID(as_uuid=True), ForeignKey("cities.id"), nullable=False)
     citizen_of_id = Column(UUID(as_uuid=True), ForeignKey("countries.id"), nullable=False)
+    previous_address = Column(Text, nullable=True)
+    last_changed_at = Column(DateTime(timezone=True), nullable=True)
+    last_changed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     resource = relationship("Resource", back_populates="address")
     city = relationship("City")
     country = relationship("Country")
+    changer = relationship("User", foreign_keys=[last_changed_by])
 
 
 class ResourceEmergencyContact(Base):
@@ -837,3 +851,10 @@ class ReportFlag(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     report = relationship("DailyReport", back_populates="flags")
+
+
+class Setting(Base):
+    __tablename__ = "settings"
+    key = Column(String(255), primary_key=True)
+    value = Column(Text, nullable=False)
+    description = Column(String(255), nullable=True)

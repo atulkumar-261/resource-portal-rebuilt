@@ -24,6 +24,7 @@ import {
   createResource,
   deleteResource,
 } from "@/lib/api/resources";
+import { useRMS } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/resources/")({
   component: ResourcesPage,
@@ -38,6 +39,8 @@ function ResourcesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [showCreds, setShowCreds] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const addResource = useRMS((s) => s.addResource);
 
   const resourcesQuery = useQuery({
     queryKey: resourcesQueryKey,
@@ -61,6 +64,24 @@ function ResourcesPage() {
       setCreateOpen(false);
       setShowCreds(data);
       queryClient.invalidateQueries({ queryKey: resourcesQueryKey });
+      if (data && data.resource) {
+        addResource({
+          id: data.resource.id,
+          fullName: data.resource.full_name,
+          employeeId: data.resource.employee_id,
+          email: data.resource.email,
+          skillset: data.resource.skillset || "",
+          status: (data.resource.status || "pending") as any,
+          jobTitle: "Developer",
+          weeklyAllowedHours: 35,
+          onboardingStatus: "pending",
+          approvalStatus: "pending",
+          profileCompletionPercentage: 0,
+          userIsActive: true,
+          isDeleted: false,
+          hasRequiredDocuments: false,
+        } as any);
+      }
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to create resource.");

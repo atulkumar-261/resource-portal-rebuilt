@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user
-from backend.app.models.database import Client, AuditLog, User
+from backend.app.models.database import Client, User
 from backend.app.schemas.clients import ClientCreateRequest, ClientUpdateRequest, ClientResponse
 
 router = APIRouter(prefix="/clients", tags=["Clients"])
@@ -22,6 +22,9 @@ def _snapshot(client: Client) -> Dict[str, Any]:
         "address": client.address,
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -31,25 +34,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    savepoint = db.begin_nested()
-    try:
-        db.add(
-            AuditLog(
-                module="clients",
-                action=action,
-                table_name="clients",
-                record_id=client_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        savepoint.rollback()
-        import logging
-        logging.getLogger(__name__).exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="clients",
+        action=action,
+        table_name="clients",
+        record_id=client_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 @router.get("", response_model=List[ClientResponse])
 def get_clients(

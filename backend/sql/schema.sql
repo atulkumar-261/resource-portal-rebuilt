@@ -170,7 +170,10 @@ CREATE TABLE resource_addresses (
     resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE UNIQUE,
     current_address TEXT NOT NULL,
     city_id UUID NOT NULL REFERENCES cities(id),
-    citizen_of_id UUID NOT NULL REFERENCES countries(id)
+    citizen_of_id UUID NOT NULL REFERENCES countries(id),
+    previous_address TEXT NULL,
+    last_changed_at TIMESTAMPTZ NULL,
+    last_changed_by UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE resource_emergency_contacts (
@@ -203,6 +206,8 @@ CREATE TABLE document_attachments (
     file_size INT NOT NULL,
     mime_type VARCHAR(100) NOT NULL,
     uploaded_by UUID NOT NULL REFERENCES users(id),
+    entity_type VARCHAR(50) NULL,
+    entity_id UUID NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -373,6 +378,9 @@ CREATE TABLE payslips (
     notes TEXT NULL,
     amount DECIMAL(10,2) NOT NULL,
     file_attachment_id UUID NULL REFERENCES document_attachments(id),
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -385,7 +393,10 @@ CREATE TABLE announcements (
     subject VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     date DATE NOT NULL,
-    created_by UUID NOT NULL REFERENCES users(id)
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT
 );
 
 CREATE TABLE settings (
@@ -532,8 +543,8 @@ CREATE TABLE project_requirements (
     description TEXT,
     estimated_hours INTEGER,
     priority VARCHAR(50),
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE project_skill_requirements (
@@ -541,7 +552,7 @@ CREATE TABLE project_skill_requirements (
     requirement_id INTEGER NOT NULL REFERENCES project_requirements(id) ON DELETE CASCADE,
     skill_id UUID NOT NULL REFERENCES skills_master(id) ON DELETE CASCADE,
     required_level VARCHAR(50),
-    mandatory BOOLEAN DEFAULT TRUE
+    mandatory BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE project_assignments (
@@ -551,7 +562,7 @@ CREATE TABLE project_assignments (
     resource_id UUID NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
     assignment_type VARCHAR(50),
     assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE ai_analysis_results (
@@ -560,7 +571,7 @@ CREATE TABLE ai_analysis_results (
     prompt TEXT NOT NULL,
     response JSONB NOT NULL,
     model_name VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_proj_req_proj ON project_requirements(project_id);

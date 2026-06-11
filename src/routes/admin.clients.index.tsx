@@ -62,7 +62,7 @@ function ClientsPage() {
   ];
 
   // Sidebar active resources filter
-  const activeResources = resources.filter((r) => r.status === "active");
+  const activeResources = resources.filter((r) => r.status === "active" && r.approvalStatus === "approved");
   const filteredActive = activeResources.filter(
     (r) =>
       r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||

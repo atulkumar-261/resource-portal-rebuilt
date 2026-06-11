@@ -50,6 +50,8 @@ export interface Resource {
   emergencyEmail: string;
   emergencyAddress: string;
   status: "active" | "pending" | "resigned" | "terminated";
+  approvalStatus?: string;
+  onboardingStatus?: string;
   avatarUrl?: string;
   totalLeaves?: number;
   weeklyAllowedHours?: number;
@@ -62,6 +64,21 @@ export interface Resource {
   holidaySheetName?: string;
   otherDocsName?: string;
   otherInfo?: string;
+  profileCompletionPercentage: number;
+  userIsActive: boolean;
+  isDeleted: boolean;
+  hasRequiredDocuments: boolean;
+}
+
+export function isResourceAssignable(resource: Resource) {
+  return (
+    resource.status === "active" &&
+    resource.approvalStatus === "approved" &&
+    resource.onboardingStatus === "completed" &&
+    resource.profileCompletionPercentage >= 80 &&
+    resource.userIsActive === true &&
+    resource.isDeleted !== true
+  );
 }
 
 export interface Client {

@@ -8,13 +8,14 @@ from sqlalchemy import func
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user
-from backend.app.models.database import Timesheet, TimesheetEntry, Resource, User, AuditLog, Project, Approval
+from backend.app.models.database import Timesheet, TimesheetEntry, Resource, User, Project, Approval
 from backend.app.schemas.timesheet import (
     TimesheetSubmitRequest,
     TimesheetApprovalRequest,
 )
 from backend.app.services.timesheet_service import TimesheetService
 from backend.app.repositories.timesheet_repository import TimesheetRepository
+from backend.app.services.resource_eligibility import validate_resource_assignable
 
 router = APIRouter(prefix="/timesheets", tags=["Timesheets"])
 
@@ -26,6 +27,9 @@ def _snapshot(ts: Timesheet) -> Dict[str, Any]:
         "status": ts.status,
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -35,26 +39,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="timesheets",
-                action=action,
-                table_name="timesheets",
-                record_id=ts_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="timesheets",
+        action=action,
+        table_name="timesheets",
+        record_id=ts_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 def _timesheet_response(db: Session, ts: Timesheet) -> Dict[str, Any]:
     res_name = ts.resource.full_name if ts.resource else "Unknown Resource"
@@ -149,10 +144,17 @@ def submit_weekly_timesheet(
             detail="Only resource accounts are authorized to submit timesheets."
         )
 
-    # Re-verify resource exists and isn't deleted
+    # Re-verify resource exists, isn't deleted, and is active & approved
     res = db.query(Resource).filter(Resource.id == current_user.resource_id, Resource.is_deleted == False).first()
     if not res:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource profile not found.")
+    try:
+        validate_resource_assignable(res)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only active, approved, and fully onboarded resources can submit timesheets."
+        )
 
     ts = TimesheetService.submit_timesheet(
         db=db,

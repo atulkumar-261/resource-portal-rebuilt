@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { PageCard } from "@/components/layout/AppShell";
 import { useRMS, calculateResourceCapacity } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -118,6 +119,7 @@ function AIProjectCreatorWizard() {
   
   // Zustand store actions and state
   const resources = useRMS((s) => s.resources);
+  const activeResources = resources.filter(isResourceAssignable);
   const projects = useRMS((s) => s.projects);
   const projectRequirements = useRMS((s) => s.projectRequirements);
   const projectAssignments = useRMS((s) => s.projectAssignments);
@@ -271,7 +273,7 @@ function AIProjectCreatorWizard() {
     const transferableMatches: any[] = [];
     const upskillCandidates: any[] = [];
 
-    resources.forEach(r => {
+    activeResources.forEach(r => {
       const rSkills = r.skillset.toLowerCase().split(",").map(s => s.trim());
       let matchedCount = 0;
       let matchScore = 0;
@@ -751,7 +753,7 @@ function AIProjectCreatorWizard() {
                           <SelectValue placeholder="Choose Resource..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {resources.map((r) => (
+                          {activeResources.map((r) => (
                             <SelectItem key={r.id} value={r.id}>
                               {r.fullName} ({r.jobTitle})
                             </SelectItem>
@@ -876,7 +878,7 @@ function AIProjectCreatorWizard() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="unassigned">Unassigned</SelectItem>
-                              {resources.map((r) => (
+                              {activeResources.map((r) => (
                                 <SelectItem key={r.id} value={r.id}>{r.fullName}</SelectItem>
                               ))}
                             </SelectContent>
@@ -934,7 +936,7 @@ function AIProjectCreatorWizard() {
               Below is the daily workload layout mapped on calendar dates (excluding weekends and keeping 8h daily capacity).
             </p>
             <div className="border border-slate-200 rounded p-4 bg-slate-50 space-y-4">
-              {resources.map((res) => {
+              {activeResources.map((res) => {
                 const resSchedule = taskScheduleEntries.filter(
                   se => se.resourceId === res.id && activeProjectTasks.some(pt => pt.id === se.taskId)
                 );

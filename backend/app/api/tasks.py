@@ -17,7 +17,6 @@ from backend.app.models.database import (
     TaskTimeLog,
     Resource,
     Task,
-    AuditLog,
     TaskStatus,
     User
 )
@@ -34,6 +33,7 @@ from backend.app.services.ai.task_planner import TaskPlanner
 from backend.app.services.ai.dependency_analyzer import DependencyAnalyzer
 from backend.app.services.ai.daily_task_scheduler import DailyTaskScheduler
 from backend.app.services.ai.workload_service import WorkloadService
+from backend.app.services.resource_eligibility import validate_resource_assignable
 
 # APIRouters
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -68,6 +68,9 @@ def _snapshot(task: Task) -> Dict[str, Any]:
     }
 
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -77,40 +80,40 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="tasks",
-                action=action,
-                table_name="tasks",
-                record_id=task_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="tasks",
+        action=action,
+        table_name="tasks",
+        record_id=task_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 
 def _task_response(db: Session, task: Task) -> TaskResponse:
     # Resolve resource name
-    res = db.query(Resource).filter(Resource.id == task.resource_id).first()
-    res_name = res.full_name if res else "Unknown Resource"
+    if task.resource:
+        res_name = task.resource.full_name
+    else:
+        res = db.query(Resource).filter(Resource.id == task.resource_id).first()
+        res_name = res.full_name if res else "Unknown Resource"
 
     # Resolve project name
-    proj = db.query(Project).filter(Project.id == task.project_id).first()
-    proj_name = proj.name if proj else "Unknown Project"
+    if task.project:
+        proj_name = task.project.name
+    else:
+        proj = db.query(Project).filter(Project.id == task.project_id).first()
+        proj_name = proj.name if proj else "Unknown Project"
 
     # Resolve status name
-    status_rec = db.query(TaskStatus).filter(TaskStatus.id == task.status_id).first()
-    status_name = status_rec.name if status_rec else "pending"
+    if task.status:
+        status_name = task.status.name
+    else:
+        status_rec = db.query(TaskStatus).filter(TaskStatus.id == task.status_id).first()
+        status_name = status_rec.name if status_rec else "pending"
 
     return TaskResponse(
         id=task.id,
@@ -134,7 +137,12 @@ def get_tasks(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_current_user),
 ):
-    tasks = db.query(Task).filter(Task.is_deleted == False).order_by(Task.created_at.desc()).all()
+    from sqlalchemy.orm import joinedload
+    tasks = db.query(Task).options(
+        joinedload(Task.resource),
+        joinedload(Task.project),
+        joinedload(Task.status)
+    ).filter(Task.is_deleted == False).order_by(Task.created_at.desc()).all()
     return [_task_response(db, t) for t in tasks]
 
 
@@ -148,6 +156,7 @@ def create_task(
     resource = db.query(Resource).filter(Resource.id == request.resource_id, Resource.is_deleted == False).first()
     if not resource:
         raise HTTPException(status_code=400, detail="Resource not found or deleted.")
+    validate_resource_assignable(resource)
 
     # Resolve Project Name
     proj = db.query(Project).filter(
@@ -225,6 +234,7 @@ def update_task(
         res = db.query(Resource).filter(Resource.id == request.resource_id, Resource.is_deleted == False).first()
         if not res:
             raise HTTPException(status_code=400, detail="Resource not found.")
+        validate_resource_assignable(res)
         changed["resource_id"] = {"old": str(task.resource_id), "new": str(res.id)}
         task.resource_id = res.id
 
@@ -378,18 +388,22 @@ def reassign_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found.")
 
-    task.resource_id = request.resource_id
-    try:
-        db.commit()
+    if request.resource_id:
+        res = db.query(Resource).filter(Resource.id == request.resource_id, Resource.is_deleted == False).first()
+        if not res:
+            raise HTTPException(status_code=400, detail="Resource not found or deleted.")
+        validate_resource_assignable(res)
+
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
+        task.resource_id = request.resource_id
+        db.flush()
 
         # Recalculate schedule entries for the project
         project = db.query(Project).filter(Project.id == task.project_id).first()
         project_tasks = db.query(ProjectTask).filter(ProjectTask.project_id == task.project_id).all()
         DailyTaskScheduler.schedule_tasks(db, str(task.project_id), project.start_date, project_tasks)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
 
     return {"status": "success", "message": "Task reassigned and project schedule updated successfully."}
 

@@ -17,6 +17,9 @@ export type ResourceResponse = {
   profile_completion_percentage?: number;
   onboarding_status?: string;
   approval_status?: string;
+  user_is_active?: boolean;
+  is_deleted?: boolean;
+  has_required_documents?: boolean;
   nationality?: string | null;
   passport_number?: string | null;
   passport_expiry?: string | null;
@@ -24,6 +27,18 @@ export type ResourceResponse = {
   visa_expiry?: string | null;
   department_id: string;
   designation_id: string;
+  designation_title: string;
+
+  // Enriched flat relationships
+  address?: string | null;
+  citizen_of?: string | null;
+  account_number?: string | null;
+  sort_code?: string | null;
+  bank_name?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_email?: string | null;
+  emergency_contact_address?: string | null;
 };
 
 export type ResourceDetailResponse = {
@@ -63,6 +78,7 @@ export type SelfProfilePayload = {
   bank_name?: string;
   account_number?: string;
   sort_code?: string;
+  avatar_url?: string;
 };
 
 export async function fetchResources(): Promise<ResourceResponse[]> {
@@ -72,6 +88,8 @@ export async function fetchResources(): Promise<ResourceResponse[]> {
 export type ResourceLoginInfo = {
   has_account: boolean;
   username?: string;
+  email?: string;
+  role?: string;
   is_active?: boolean;
   last_login?: string | null;
 };
@@ -293,4 +311,18 @@ export async function fetchResourceDocuments(resourceId: string): Promise<Resour
 
 export async function deleteResourceDocument(documentId: string): Promise<{ status: string }> {
   return apiFetch<{ status: string }>(`/resources/documents/${documentId}`, { method: "DELETE" });
+}
+
+export type AddressChangeResponse = {
+  id: string;
+  resource_id: string;
+  resource_name: string;
+  current_address: string;
+  old_address: string | null;
+  changed_by: string | null;
+  created_at: string | null;
+};
+
+export async function fetchAddressChanges(): Promise<AddressChangeResponse[]> {
+  return apiFetch<AddressChangeResponse[]>("/reports/address-changes");
 }

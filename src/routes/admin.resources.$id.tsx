@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo } from "react";
 import { useRMS } from "@/lib/store";
 import { User as UserIcon, XCircle, Shield, KeyRound, Copy, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchResource, fetchResourceLogin, updateResourceStatus, resetResourcePassword, updateResourceProfile, approveResourceOnboarding } from "@/lib/api/resources";
+import { fetchResource, fetchResourceLogin, updateResourceStatus, resetResourcePassword, updateResourceProfile, approveResourceOnboarding, fetchResourceDocuments } from "@/lib/api/resources";
+import { getApiBaseUrl } from "@/lib/api/client";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -50,39 +51,40 @@ function ResourceDetail() {
 
   const dbResource = resourceQuery.data;
   const mockResource = resources.find((x) => x.id === id);
-  const rawR = isUuid ? dbResource : mockResource;
+  const rawR = isUuid ? dbResource?.resource : mockResource;
 
   const r = useMemo(() => {
     if (!rawR) return undefined;
+    const temp = rawR as any;
     return {
-      id: rawR.id,
-      fullName: rawR.fullName ?? rawR.full_name ?? "",
-      email: rawR.email ?? "",
-      employeeId: rawR.employeeId ?? rawR.employee_id ?? "",
-      skillset: rawR.skillset ?? "",
-      phone: rawR.phone ?? "",
-      address: rawR.address ?? "",
-      citizenOf: rawR.citizenOf ?? rawR.citizen_of ?? "",
-      passportNumber: rawR.passportNumber ?? rawR.passport_number ?? "",
-      passportExpiry: rawR.passportExpiry ?? rawR.passport_expiry ?? "",
-      visaNumber: rawR.visaNumber ?? rawR.visa_number ?? "",
-      visaExpiry: rawR.visaExpiry ?? rawR.visa_expiry ?? "",
-      niNumber: rawR.niNumber ?? rawR.ni_number ?? "",
-      dob: rawR.dob ?? "",
-      bankAccount: rawR.bankAccount ?? rawR.bank_account ?? "",
-      sortCode: rawR.sortCode ?? rawR.sort_code ?? "",
-      bankName: rawR.bankName ?? rawR.bank_name ?? "",
-      emergencyName: rawR.emergencyName ?? rawR.emergency_name ?? "",
-      emergencyPhone: rawR.emergencyPhone ?? rawR.emergency_phone ?? "",
-      emergencyEmail: rawR.emergencyEmail ?? rawR.emergency_email ?? "",
-      emergencyAddress: rawR.emergencyAddress ?? rawR.emergency_address ?? "",
-      status: rawR.status ?? "active",
-      avatarUrl: rawR.avatarUrl ?? rawR.avatar_url ?? undefined,
-      totalLeaves: rawR.totalLeaves ?? rawR.total_leaves ?? 20,
-      weeklyAllowedHours: rawR.weeklyAllowedHours ?? rawR.weekly_allowed_hours ?? 40,
-      oldAddressLog: rawR.oldAddressLog ?? rawR.old_address_log ?? "",
-      performanceNotes: rawR.performanceNotes ?? rawR.performance_notes ?? "",
-      assignedProjects: rawR.assignedProjects ?? rawR.assigned_projects ?? [],
+      id: temp.id,
+      fullName: temp.fullName ?? temp.full_name ?? "",
+      email: temp.email ?? "",
+      employeeId: temp.employeeId ?? temp.employee_id ?? "",
+      skillset: temp.skillset ?? "",
+      phone: temp.phone ?? "",
+      address: temp.address ?? "",
+      citizenOf: temp.citizenOf ?? temp.citizen_of ?? "",
+      passportNumber: temp.passportNumber ?? temp.passport_number ?? "",
+      passportExpiry: temp.passportExpiry ?? temp.passport_expiry ?? "",
+      visaNumber: temp.visaNumber ?? temp.visa_number ?? "",
+      visaExpiry: temp.visaExpiry ?? temp.visa_expiry ?? "",
+      niNumber: temp.niNumber ?? temp.ni_number ?? "",
+      dob: temp.dob ?? "",
+      bankAccount: temp.bankAccount ?? temp.bank_account ?? temp.account_number ?? "",
+      sortCode: temp.sortCode ?? temp.sort_code ?? "",
+      bankName: temp.bankName ?? temp.bank_name ?? "",
+      emergencyName: temp.emergencyName ?? temp.emergency_name ?? temp.emergency_contact_name ?? "",
+      emergencyPhone: temp.emergencyPhone ?? temp.emergency_phone ?? temp.emergency_contact_phone ?? "",
+      emergencyEmail: temp.emergencyEmail ?? temp.emergency_email ?? temp.emergency_contact_email ?? "",
+      emergencyAddress: temp.emergencyAddress ?? temp.emergency_address ?? temp.emergency_contact_address ?? "",
+      status: temp.status ?? "active",
+      avatarUrl: temp.avatarUrl ?? temp.avatar_url ?? undefined,
+      totalLeaves: temp.totalLeaves ?? temp.total_leaves ?? 20,
+      weeklyAllowedHours: temp.weeklyAllowedHours ?? temp.weekly_allowed_hours ?? 40,
+      oldAddressLog: temp.oldAddressLog ?? temp.old_address_log ?? "",
+      performanceNotes: temp.performanceNotes ?? temp.performance_notes ?? "",
+      assignedProjects: temp.assignedProjects ?? temp.assigned_projects ?? [],
     };
   }, [rawR]);
 
@@ -91,7 +93,16 @@ function ResourceDetail() {
   const loginQuery = useQuery({
     queryKey: ["resource-login", id],
     queryFn: () => fetchResourceLogin(id),
+    enabled: isUuid,
   });
+
+  const documentsQuery = useQuery({
+    queryKey: ["resource-documents", id],
+    queryFn: () => fetchResourceDocuments(id),
+    enabled: isUuid,
+  });
+
+  const documents = documentsQuery.data || [];
 
   const statusMutation = useMutation({
     mutationFn: (active: boolean) => updateResourceStatus(id, { is_active: active }),
@@ -135,6 +146,32 @@ function ResourceDetail() {
       setAssignedProjects(r.assignedProjects || []);
     }
   }, [r]);
+
+  // Extract enriched onboarding data from backend (available when isUuid)
+  const enrichedData = useMemo(() => {
+    if (!isUuid || !dbResource) return null;
+    return {
+      completionPct: dbResource.profile_completion_percentage ?? 0,
+      onboardingStatus: dbResource.onboarding_status ?? "pending",
+      approvalStatus: dbResource.resource?.approval_status ?? (dbResource as any).approval_status ?? "pending_approval",
+      missingFields: dbResource.missing_fields ?? [],
+      utilization: dbResource.current_utilization ?? 0,
+      availableHours: dbResource.available_capacity_hours ?? 0,
+    };
+  }, [isUuid, dbResource]);
+
+  const approveMutation = useMutation({
+    mutationFn: () => approveResourceOnboarding(id),
+    onSuccess: () => {
+      toast.success("Resource onboarding approved successfully.");
+      queryClient.invalidateQueries({ queryKey: ["resource-detail", id] });
+      queryClient.invalidateQueries({ queryKey: ["resources-list"] });
+      updateResource(id, { status: "active", approvalStatus: "approved" });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to approve.");
+    },
+  });
 
   if (isUuid && resourceQuery.isLoading) {
     return (
@@ -198,29 +235,70 @@ function ResourceDetail() {
   // Utility to display values or "Not Entered"
   const valOrEmpty = (val?: string) => val?.trim() || "Not Entered";
 
-  // Extract enriched onboarding data from backend (available when isUuid)
-  const enrichedData = useMemo(() => {
-    if (!isUuid || !dbResource) return null;
-    return {
-      completionPct: dbResource.profile_completion_percentage ?? 0,
-      onboardingStatus: dbResource.onboarding_status ?? "pending",
-      approvalStatus: dbResource.approval_status ?? "pending_approval",
-      missingFields: dbResource.missing_fields ?? [],
-      utilization: dbResource.current_utilization ?? 0,
-      availableHours: dbResource.available_capacity_hours ?? 0,
-    };
-  }, [isUuid, dbResource]);
 
-  const approveMutation = useMutation({
-    mutationFn: () => approveResourceOnboarding(id),
-    onSuccess: () => {
-      toast.success("Resource onboarding approved!");
-      queryClient.invalidateQueries({ queryKey: ["resource-detail", id] });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Failed to approve.");
-    },
-  });
+  const isDocType = (docType: string | undefined | null, target: string) => {
+    if (!docType) return false;
+    const norm = docType.toLowerCase().replace(/_/g, " ").trim();
+    if (target === "passport") {
+      return norm === "passport" || norm === "passport copy" || norm === "passport copy:";
+    }
+    if (target === "visa") {
+      return norm === "visa" || norm === "visa copy" || norm === "visa copy:";
+    }
+    if (target === "holiday sheet") {
+      return norm === "holiday sheet" || norm === "holdiay sheet" || norm === "holiday_sheet";
+    }
+    return norm === target;
+  };
+
+  const getDocLink = (type: string) => {
+    const doc = documents.find(d => isDocType(d.document_type, type));
+    if (!doc) return <span className="text-xs text-stone-500 mt-0.5">Not Uploaded</span>;
+    const base = getApiBaseUrl().replace("/api", "");
+    const fileUrl = doc.file_path ? `${base}/uploads/${doc.file_path.split("/").pop()}` : "";
+    return (
+      <a
+        href={fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-teal-600 hover:text-teal-800 hover:underline font-semibold block mt-0.5"
+      >
+        {doc.file_name}
+      </a>
+    );
+  };
+
+  const getOtherDocsLinks = () => {
+    const otherDocs = documents.filter(d => {
+      return d.document_type &&
+             !isDocType(d.document_type, "passport") &&
+             !isDocType(d.document_type, "visa") &&
+             !isDocType(d.document_type, "holiday sheet") &&
+             d.document_type.toLowerCase().trim() !== "cv";
+    });
+    if (otherDocs.length === 0) return <span className="text-xs text-stone-500 mt-0.5">Not uploaded</span>;
+    const base = getApiBaseUrl().replace("/api", "");
+    return (
+      <div className="space-y-1 mt-1">
+        {otherDocs.map(doc => {
+          const fileUrl = doc.file_path ? `${base}/uploads/${doc.file_path.split("/").pop()}` : "";
+          return (
+            <div key={doc.id} className="text-xs flex items-center gap-1.5">
+              <span className="text-stone-400 font-mono text-[10px]">[{doc.document_type}]</span>
+              <a
+                href={fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-teal-600 hover:text-teal-800 hover:underline font-semibold"
+              >
+                {doc.file_name}
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white rounded-lg border border-slate-300 p-8 max-w-5xl shadow-sm">
@@ -331,7 +409,29 @@ function ResourceDetail() {
             </div>
             <div className="space-y-1">
               <h3 className="text-xl font-bold text-slate-800">{r.fullName}</h3>
-              <p className="text-stone-500 font-semibold">CV Not Uploaded</p>
+              {documents.some(d => d.document_type?.toLowerCase() === "cv") ? (
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-emerald-600 font-semibold text-xs bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">CV Uploaded</span>
+                  {(() => {
+                    const cvDoc = documents.find(d => d.document_type?.toLowerCase() === "cv");
+                    if (!cvDoc) return null;
+                    const base = getApiBaseUrl().replace("/api", "");
+                    const fileUrl = cvDoc.file_path ? `${base}/uploads/${cvDoc.file_path.split("/").pop()}` : "";
+                    return (
+                      <a
+                        href={fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-teal-600 hover:text-teal-800 hover:underline font-semibold"
+                      >
+                        View CV
+                      </a>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <p className="text-stone-500 font-semibold text-xs mt-0.5 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded w-fit">CV Not Uploaded</p>
+              )}
             </div>
           </div>
 
@@ -624,19 +724,19 @@ function ResourceDetail() {
           <div className="space-y-4 pt-4 border-t border-slate-100 text-left">
             <div>
               <div className="font-bold text-stone-800">Passport Copy:</div>
-              <div className="text-xs text-stone-500 mt-0.5">Not Uploaded</div>
+              {getDocLink("passport")}
             </div>
             <div>
               <div className="font-bold text-stone-800">Visa Copy:</div>
-              <div className="text-xs text-stone-500 mt-0.5">Not Uploaded</div>
+              {getDocLink("visa")}
             </div>
             <div>
               <div className="font-bold text-stone-800">Holdiay Sheet:</div>
-              <div className="text-xs text-stone-500 mt-0.5">Not Uploaded</div>
+              {getDocLink("holiday sheet")}
             </div>
             <div>
               <div className="font-bold text-stone-800">Other Documents:</div>
-              <div className="text-xs text-stone-500 mt-0.5">Not uploaded</div>
+              {getOtherDocsLinks()}
             </div>
           </div>
         </div>

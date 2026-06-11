@@ -143,8 +143,8 @@ export function DailyReportModal({ isOpen, onClose }: DailyReportModalProps) {
         projectId: selectedProjectId,
         workDate: new Date().toISOString().split("T")[0],
         workDone,
-        blockers: blockers || null,
-        tomorrowPlan: tomorrowPlan || null,
+        blockers: blockers || undefined,
+        tomorrowPlan: tomorrowPlan || undefined,
         hoursWorked: finalHours,
       }, items);
 

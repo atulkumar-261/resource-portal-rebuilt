@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { validateFileSize } from "@/lib/utils/uploadValidation";
 
 export const Route = createFileRoute("/admin/announcements/new")({
   component: AdminannouncementsnewPage,
@@ -87,6 +88,14 @@ function AdminannouncementsnewPage() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
+                if (file) {
+                  if (!validateFileSize(file)) {
+                    setSelectedFile(null);
+                    setFileName("No file chosen");
+                    e.target.value = "";
+                    return;
+                  }
+                }
                 setFileName(file ? file.name : "No file chosen");
                 setSelectedFile(file || null);
               }}

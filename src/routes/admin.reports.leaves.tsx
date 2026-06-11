@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
+import { downloadCsv } from "@/lib/utils/csv";
 import { PageCard } from "@/components/layout/AppShell";
 import { ArrowLeft } from "lucide-react";
 
@@ -49,19 +51,7 @@ function LeaveRecordsPage() {
       l.status,
     ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "leave_records.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv("leaves", headers, rows);
   };
 
   return (
@@ -87,7 +77,7 @@ function LeaveRecordsPage() {
               className="border border-black px-2 py-1 bg-white font-medium focus:outline-none min-w-[150px]"
             >
               <option value="All">All Resources</option>
-              {resources.map((r) => (
+              {resources.filter(isResourceAssignable).map((r) => (
                 <option key={r.id} value={r.fullName}>
                   {r.fullName}
                 </option>

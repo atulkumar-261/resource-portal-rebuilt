@@ -37,6 +37,17 @@ def ensure_bootstrap_upgrades(cursor):
     cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE")
     cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL")
     cursor.execute("ALTER TABLE payslips ADD COLUMN IF NOT EXISTS deleted_by UUID NULL REFERENCES users(id) ON DELETE SET NULL")
+    cursor.execute("ALTER TABLE resource_addresses ADD COLUMN IF NOT EXISTS previous_address TEXT NULL")
+    cursor.execute("ALTER TABLE resource_addresses ADD COLUMN IF NOT EXISTS last_changed_at TIMESTAMPTZ NULL")
+    cursor.execute("ALTER TABLE resource_addresses ADD COLUMN IF NOT EXISTS last_changed_by UUID NULL REFERENCES users(id) ON DELETE SET NULL")
+
+    # Align legacy resources: if onboarding or approval is pending, enforce 'pending' status in DB
+    cursor.execute("""
+        UPDATE resources
+        SET status_id = (SELECT id FROM resource_statuses WHERE name = 'pending')
+        WHERE (approval_status = 'pending' OR onboarding_status = 'pending')
+          AND status_id != (SELECT id FROM resource_statuses WHERE name = 'pending')
+    """)
 
 
     # Check if resource_documents table is using the old schema or need recreation

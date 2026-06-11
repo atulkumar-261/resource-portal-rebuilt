@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
 
 export const Route = createFileRoute("/admin/tasks/new")({ component: NewTask });
 
 function NewTask() {
   const add = useRMS((s) => s.addTask);
   const resources = useRMS((s) => s.resources);
+  const activeResources = resources.filter(isResourceAssignable);
   const projects = useRMS((s) => s.projects);
   const router = useRouter();
   const { register, handleSubmit, watch, setValue } = useForm({
@@ -63,7 +65,7 @@ function NewTask() {
               <SelectValue placeholder="Select Resource" />
             </SelectTrigger>
             <SelectContent>
-              {resources.map((r) => (
+              {activeResources.map((r) => (
                 <SelectItem key={r.id} value={r.id}>
                   {r.fullName}
                 </SelectItem>

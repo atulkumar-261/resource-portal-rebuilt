@@ -3,6 +3,7 @@ from uuid import UUID
 from datetime import date
 from sqlalchemy.orm import Session
 from backend.app.models.database import Resource, Project, ProjectRequirement, ProjectAssignment, ResourceStatus, SkillMaster, User
+from backend.app.services.resource_eligibility import is_resource_assignable
 from backend.app.schemas.ai import ResourceMatchDetail, ModuleRecommendationGroup
 
 # Related skill mappings for Score 75 (Related Matches)
@@ -89,35 +90,9 @@ class ResourceMatcher:
         """
         Checks AI assignment eligibility for a resource.
         Returns: {"eligible": bool, "status": str, "reason": str}
-        
-        Eligible: completion >= 80%, approved, active user, not deleted, utilization < 100%.
-        Conditional: completion 40%-79%. Show as warning candidate.
-        Blocked: completion < 40%, inactive user, deleted, not approved, or utilization >= 100%.
         """
-        # 1. Must not be soft-deleted
-        if resource.is_deleted:
-            return {"eligible": False, "status": "blocked", "reason": "Resource is deleted"}
-        
-        # 2. Must have an active linked User account
-        linked_user = db.query(User).filter(User.resource_id == resource.id).first()
-        if not linked_user or not linked_user.is_active:
-            return {"eligible": False, "status": "blocked", "reason": "User account inactive or missing"}
-        
-        # 3. Must be approved
-        if resource.approval_status != "approved":
-            return {"eligible": False, "status": "blocked", "reason": "Pending approval"}
-        
-        # 4. Onboarding completion check
-        completion = resource.profile_completion_percentage or 0
-        if completion < 40:
-            return {"eligible": False, "status": "blocked", "reason": f"Profile completion too low ({completion}%)"}
-        
-        if completion < 80:
-            return {"eligible": False, "status": "conditional", "reason": f"Profile incomplete ({completion}%) — conditional candidate"}
-        
-        # 5. Onboarding status must be completed
-        if resource.onboarding_status != "completed":
-            return {"eligible": False, "status": "conditional", "reason": "Onboarding not completed"}
+        if not is_resource_assignable(resource):
+            return {"eligible": False, "status": "blocked", "reason": "Resource fails lifecycle validation."}
         
         return {"eligible": True, "status": "eligible", "reason": "Fully eligible"}
 

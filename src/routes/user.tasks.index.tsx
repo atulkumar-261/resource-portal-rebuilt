@@ -15,9 +15,12 @@ function UserTasksPage() {
   const router = useRouter();
 
   // Load both legacy and new project tasks
-  const legacyTasks = useRMS((s) => s.tasks.filter((t) => t.resourceId === resourceId));
-  const projectTasks = useRMS((s) => s.projectTasks.filter((t) => t.resourceId === resourceId));
+  const allTasks = useRMS((s) => s.tasks);
+  const allProjectTasks = useRMS((s) => s.projectTasks);
   const projects = useRMS((s) => s.projects);
+
+  const legacyTasks = allTasks.filter((t) => t.resourceId === resourceId);
+  const projectTasks = allProjectTasks.filter((t) => t.resourceId === resourceId);
 
   const [activeTab, setActiveTab] = useState<"project" | "legacy">("project");
 

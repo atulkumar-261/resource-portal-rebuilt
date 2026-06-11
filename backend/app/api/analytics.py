@@ -4,37 +4,36 @@ from sqlalchemy.orm import Session
 from backend.app.models.database import Resource, Task, Leave, Timesheet, TimesheetEntry, Project, TaskStatus, ResourceStatus, ProjectStatus, User
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_current_user
+from backend.app.services.resource_eligibility import is_resource_assignable
 
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 
 @router.get("/dashboard-kpis")
 def get_dashboard_kpis(db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
-    # 1. Total active resources count
-    active_status = db.query(ResourceStatus).filter(ResourceStatus.name == "active").first()
-    active_resources = db.query(Resource).filter(
-        Resource.status_id == active_status.id if active_status else None,
+    from sqlalchemy.orm import joinedload
+    base_query = db.query(Resource).options(
+        joinedload(Resource.status),
+        joinedload(Resource.user)
+    ).filter(Resource.is_deleted == False)
+    resources = base_query.all()
+
+    total_resources = len(resources)
+    assignable_resources = sum(1 for r in resources if is_resource_assignable(r))
+    pending_resources = db.query(Resource).filter(
+        (Resource.approval_status == "pending") | (Resource.onboarding_status != "completed"),
+        Resource.is_deleted == False
+    ).count()
+    rejected_resources = db.query(Resource).filter(
+        Resource.approval_status == "rejected",
         Resource.is_deleted == False
     ).count()
 
-    # 2. Total tasks count
-    total_tasks = db.query(Task).filter(Task.is_deleted == False).count()
-
-    # 3. Pending leave requests count
-    pending_leaves = db.query(Leave).filter(Leave.status == "pending", Leave.is_deleted == False).count()
-
-    # 4. Total active projects count
-    active_proj_status = db.query(ProjectStatus).filter(ProjectStatus.name == "active").first()
-    active_projects = db.query(Project).filter(
-        Project.status_id == active_proj_status.id if active_proj_status else None,
-        Project.is_deleted == False
-    ).count()
-
     return {
-        "active_resources": active_resources,
-        "total_tasks": total_tasks,
-        "pending_leaves": pending_leaves,
-        "active_projects": active_projects
+        "total_resources": total_resources,
+        "assignable_resources": assignable_resources,
+        "pending_resources": pending_resources,
+        "rejected_resources": rejected_resources
     }
 
 

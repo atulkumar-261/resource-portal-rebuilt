@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
+import { downloadCsv, formatCsvCell } from "@/lib/utils/csv";
 import { PageCard } from "@/components/layout/AppShell";
 import { ArrowLeft } from "lucide-react";
 
@@ -37,7 +39,7 @@ function ProfileRecordsPage() {
       "Status",
     ];
     const rows = filtered.map((r) => [
-      r.employeeId || "—",
+      formatCsvCell(r.employeeId || "—", true),
       r.fullName,
       r.jobTitle,
       r.email,
@@ -46,19 +48,7 @@ function ProfileRecordsPage() {
       r.status,
     ]);
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "profile_records.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadCsv("profiles", headers, rows);
   };
 
   return (
@@ -163,9 +153,9 @@ function ProfileRecordsPage() {
                     </td>
                     <td className="px-4 py-2 font-normal capitalize">
                       <span
-                        className={`font-semibold ${r.status === "active" ? "text-emerald-700" : "text-amber-700"}`}
+                        className={`font-semibold ${isResourceAssignable(r) ? "text-emerald-700" : "text-amber-700"}`}
                       >
-                        {r.status}
+                        {r.status} {isResourceAssignable(r) ? "(Assignable)" : "(Ineligible)"}
                       </span>
                     </td>
                   </tr>

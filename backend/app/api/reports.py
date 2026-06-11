@@ -16,8 +16,8 @@ from backend.app.models.database import (
     ProjectAssignment,
     ReportAnalysisResult,
     ReportFlag,
-    AuditLog,
-    User
+    User,
+    ResourceAddress
 )
 from backend.app.schemas.reports import (
     DailyReportCreate,
@@ -26,7 +26,8 @@ from backend.app.schemas.reports import (
     ProductivityResponse,
     DailyReportItemResponse,
     ReportAnalysisResponse,
-    ReportFlagResponse
+    ReportFlagResponse,
+    AddressChangeResponse
 )
 from backend.app.services.ai.report_analyzer import ReportAnalyzer
 from backend.app.services.progress_service import ProgressService
@@ -34,6 +35,9 @@ from backend.app.services.report_notification_service import ReportNotificationS
 from backend.app.core.security import require_current_user, require_privileged_user
 
 logger = logging.getLogger(__name__)
+
+from backend.app.services.audit_service import AuditService
+
 
 def _audit(
     db: Session,
@@ -44,24 +48,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="reports",
-                action=action,
-                table_name="daily_reports",
-                record_id=record_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="reports",
+        action=action,
+        table_name="daily_reports",
+        record_id=record_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 router = APIRouter(prefix="/reports", tags=["Reports Audit & Progress"])
 projects_router = APIRouter(prefix="/projects", tags=["Project Reports & Metrics"])
@@ -268,28 +265,33 @@ def get_missing_reports(
         # Weekends have no mandatory reporting
         return []
 
-    # Get active project assignments
-    assignments = db.query(ProjectAssignment).join(Project).filter(Project.is_deleted == False).all()
+    # Get active project assignments, eagerly loading project and resource
+    assignments = db.query(ProjectAssignment).options(
+        joinedload(ProjectAssignment.project),
+        joinedload(ProjectAssignment.resource)
+    ).join(Project).filter(Project.is_deleted == False).all()
     
+    # Query all daily reports for check_day once
+    existing_reports = db.query(DailyReport.project_id, DailyReport.resource_id).filter(
+        DailyReport.work_date == check_day
+    ).all()
+    existing_report_keys = {(r.project_id, r.resource_id) for r in existing_reports}
+
     missing_list = []
     for assign in assignments:
-        has_log = db.query(DailyReport).filter(
-            DailyReport.project_id == assign.project_id,
-            DailyReport.resource_id == assign.resource_id,
-            DailyReport.work_date == check_day
-        ).first()
-
-        if not has_log:
-            res = db.query(Resource).filter(Resource.id == assign.resource_id, Resource.is_deleted == False).first()
-            proj = db.query(Project).filter(Project.id == assign.project_id).first()
-            
-            missing_list.append({
-                "resource_id": assign.resource_id,
-                "resource_name": res.full_name if res else "Unknown Resource",
-                "project_id": assign.project_id,
-                "project_name": proj.name if proj else "Unknown Project",
-                "work_date": check_day
-            })
+        key = (assign.project_id, assign.resource_id)
+        if key not in existing_report_keys:
+            res = assign.resource
+            # Only consider active resources
+            if res and not res.is_deleted:
+                proj = assign.project
+                missing_list.append({
+                    "resource_id": assign.resource_id,
+                    "resource_name": res.full_name,
+                    "project_id": assign.project_id,
+                    "project_name": proj.name if proj else "Unknown Project",
+                    "work_date": check_day
+                })
 
     return missing_list
 
@@ -417,3 +419,48 @@ def get_resource_productivity(
         raise HTTPException(status_code=404, detail="Developer productivity metrics not found.")
 
     return prod
+
+
+# ==========================================
+# GET /api/reports/address-changes - ADDRESS HISTORY
+# ==========================================
+
+@router.get("/address-changes", response_model=List[AddressChangeResponse])
+def get_address_changes(
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_privileged_user)
+):
+    """
+    Retrieves all address changes for non-deleted resources.
+    Requires Admin or Super Admin privileges.
+    """
+    records = (
+        db.query(ResourceAddress)
+        .join(Resource)
+        .filter(
+            Resource.is_deleted == False,
+            ResourceAddress.previous_address.isnot(None),
+            ResourceAddress.previous_address != ""
+        )
+        .order_by(desc(ResourceAddress.last_changed_at))
+        .all()
+    )
+
+    response = []
+    for record in records:
+        changed_by_name = "System"
+        if record.changer:
+            changed_by_name = record.changer.full_name or record.changer.username
+        
+        response.append(
+            AddressChangeResponse(
+                id=record.id,
+                resource_id=record.resource_id,
+                resource_name=record.resource.full_name,
+                current_address=record.current_address,
+                old_address=record.previous_address,
+                changed_by=changed_by_name,
+                created_at=record.last_changed_at
+            )
+        )
+    return response

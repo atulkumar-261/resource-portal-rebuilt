@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Search, User } from "lucide-react";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { downloadCsv, formatCsvCell } from "@/lib/utils/csv";
 
 export const Route = createFileRoute("/admin/reports/")({
   component: ReportsDashboardPage,
@@ -16,29 +17,14 @@ function ReportsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Sidebar active resources filter
-  const activeResources = resources.filter((r) => r.status === "active");
+  const activeResources = resources.filter((r) => r.status === "active" && r.approvalStatus === "approved");
   const filteredActive = activeResources.filter(
     (r) =>
       r.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.jobTitle.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // CSV Downloader helper
-  const downloadCSV = (filename: string, headers: string[], rows: string[][]) => {
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((e) => e.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // CSV downloads are now handled by the centralized downloadCsv utility.
 
   const handleDownloadTimesheets = () => {
     const headers = [
@@ -61,7 +47,7 @@ function ReportsDashboardPage() {
       t.status,
       t.projectName || "",
     ]);
-    downloadCSV("timesheet_records.csv", headers, rows);
+    downloadCsv("timesheet_records", headers, rows);
   };
 
   const handleDownloadPeriodicTimesheets = () => {
@@ -81,7 +67,7 @@ function ReportsDashboardPage() {
       String(t.totalHours),
       t.status,
     ]);
-    downloadCSV("periodic_timesheet_records.csv", headers, rows);
+    downloadCsv("periodic_timesheet_records", headers, rows);
   };
 
   const handleDownloadLeaves = () => {
@@ -105,7 +91,7 @@ function ReportsDashboardPage() {
       l.reason,
       l.status,
     ]);
-    downloadCSV("leave_records.csv", headers, rows);
+    downloadCsv("leave_records", headers, rows);
   };
 
   const handleDownloadProfiles = () => {
@@ -125,13 +111,13 @@ function ReportsDashboardPage() {
       r.fullName,
       r.jobTitle,
       r.email,
-      r.employeeId,
+      formatCsvCell(r.employeeId || "—", true),
       r.skillset,
       r.phone,
       r.address,
       r.status,
     ]);
-    downloadCSV("profile_records.csv", headers, rows);
+    downloadCsv("profile_records", headers, rows);
   };
 
   const handleDownloadOther = () => {
@@ -141,7 +127,7 @@ function ReportsDashboardPage() {
       ["ID_Verification_Jimy_Shine.pdf", "ID", "15-03-2026"],
       ["P45_Supriya_Dalli.pdf", "Tax Document", "01-05-2026"],
     ];
-    downloadCSV("other_document_records.csv", headers, rows);
+    downloadCsv("other_document_records", headers, rows);
   };
 
   return (

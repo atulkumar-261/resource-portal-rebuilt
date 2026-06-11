@@ -4,6 +4,7 @@ import { useRMS } from "@/lib/store";
 import { PageCard } from "@/components/layout/AppShell";
 import { Badge } from "@/components/ui/badge";
 import type { ProductivityMetrics } from "@/lib/types";
+import { isResourceAssignable } from "@/lib/types";
 import {
   Award,
   Clock,
@@ -38,7 +39,7 @@ function AdminProductivityDashboardPage() {
       setLoading(true);
       try {
         // Fetch productivity statistics for all developers
-        const resPromises = resources.map((r) => fetchProductivity(r.id, false));
+        const resPromises = resources.filter(isResourceAssignable).map((r) => fetchProductivity(r.id, false));
         const resProd = await Promise.all(resPromises);
         setTeamProductivity(resProd.filter((p) => p !== null));
 

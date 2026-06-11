@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user
-from backend.app.models.database import Announcement, DocumentAttachment, AuditLog, User
+from backend.app.models.database import Announcement, DocumentAttachment, User
 from backend.app.schemas.announcements import AnnouncementCreateRequest, AnnouncementResponse
 
 router = APIRouter(prefix="/announcements", tags=["Announcements"])
@@ -37,6 +37,9 @@ def _snapshot(announcement: Announcement) -> Dict[str, Any]:
         "created_by": str(announcement.created_by),
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -46,26 +49,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="announcements",
-                action=action,
-                table_name="announcements",
-                record_id=announcement_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="announcements",
+        action=action,
+        table_name="announcements",
+        record_id=announcement_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 def _announcement_response(db: Session, announcement: Announcement) -> AnnouncementResponse:
     # Resolve attachment if any
@@ -99,7 +93,9 @@ def create_announcement(
 ):
     date_obj = parse_date(request.date)
     
-    try:
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
         announcement = Announcement(
             subject=request.subject,
             message=request.message,
@@ -118,16 +114,12 @@ def create_announcement(
             new_value=_snapshot(announcement),
             changed_fields={"created": True}
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
 
     db.refresh(announcement)
     return _announcement_response(db, announcement)
 
 @router.post("/{id}/upload")
-def upload_announcement_file(
+async def upload_announcement_file(
     id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db_session),
@@ -137,10 +129,10 @@ def upload_announcement_file(
     if not announcement:
         raise HTTPException(status_code=404, detail="Announcement not found.")
 
-    from backend.app.core.file_security import validate_and_sanitize_file, check_file_size, verify_path_traversal
+    from backend.app.core.file_security import validate_and_sanitize_file, validate_upload_file, verify_path_traversal, ALLOWED_DOCUMENT_TYPES
 
     # Validate file size and types
-    check_file_size(file)
+    await validate_upload_file(file, ALLOWED_DOCUMENT_TYPES)
     sanitized_filename = validate_and_sanitize_file(file)
 
     import uuid
@@ -161,74 +153,75 @@ def upload_announcement_file(
     # Get file size
     file_size = file_path.stat().st_size
 
-    try:
-        # Check if attachment already exists for this announcement and delete it
-        existing_attachment = db.query(DocumentAttachment).filter(
-            DocumentAttachment.entity_type == "announcement",
-            DocumentAttachment.entity_id == id
-        ).first()
-        if existing_attachment:
-            # Prepare AuditLog for replacement
-            _audit(
-                db,
-                current_user,
-                id,
-                "announcement_file_replaced",
-                old_value={
-                    "actor_id": str(current_user.id),
-                    "announcement_id": str(id),
-                    "filename": existing_attachment.filename,
-                    "storage_key": existing_attachment.storage_key,
-                    "timestamp": datetime.utcnow().isoformat()
-                },
-                new_value={
-                    "actor_id": str(current_user.id),
-                    "announcement_id": str(id),
-                    "filename": sanitized_filename,
-                    "storage_key": storage_key,
-                    "timestamp": datetime.utcnow().isoformat()
-                },
-                changed_fields={"file": {"old": existing_attachment.filename, "new": sanitized_filename}}
-            )
-            # Remove old file
-            try:
-                old_path = UPLOAD_DIR / existing_attachment.storage_key
-                verify_path_traversal(old_path, UPLOAD_DIR)
-                if old_path.exists():
-                    old_path.unlink()
-            except Exception:
-                pass
-            db.delete(existing_attachment)
-        else:
-            # Prepare AuditLog for new upload
-            _audit(
-                db,
-                current_user,
-                id,
-                "announcement_file_uploaded",
-                new_value={
-                    "actor_id": str(current_user.id),
-                    "announcement_id": str(id),
-                    "filename": sanitized_filename,
-                    "storage_key": storage_key,
-                    "timestamp": datetime.utcnow().isoformat()
-                },
-                changed_fields={"file_uploaded": True}
-            )
+    from backend.app.services.transaction_service import transactional
 
-        doc = DocumentAttachment(
-            filename=sanitized_filename,
-            storage_key=storage_key,
-            file_size=file_size,
-            mime_type=file.content_type or "application/octet-stream",
-            uploaded_by=current_user.id,
-            entity_type="announcement",
-            entity_id=id
-        )
-        db.add(doc)
-        db.commit()
+    try:
+        with transactional(db):
+            # Check if attachment already exists for this announcement and delete it
+            existing_attachment = db.query(DocumentAttachment).filter(
+                DocumentAttachment.entity_type == "announcement",
+                DocumentAttachment.entity_id == id
+            ).first()
+            if existing_attachment:
+                # Prepare AuditLog for replacement
+                _audit(
+                    db,
+                    current_user,
+                    id,
+                    "announcement_file_replaced",
+                    old_value={
+                        "actor_id": str(current_user.id),
+                        "announcement_id": str(id),
+                        "filename": existing_attachment.filename,
+                        "storage_key": existing_attachment.storage_key,
+                        "timestamp": datetime.utcnow().isoformat()
+                    },
+                    new_value={
+                        "actor_id": str(current_user.id),
+                        "announcement_id": str(id),
+                        "filename": sanitized_filename,
+                        "storage_key": storage_key,
+                        "timestamp": datetime.utcnow().isoformat()
+                    },
+                    changed_fields={"file": {"old": existing_attachment.filename, "new": sanitized_filename}}
+                )
+                # Remove old file
+                try:
+                    old_path = UPLOAD_DIR / existing_attachment.storage_key
+                    verify_path_traversal(old_path, UPLOAD_DIR)
+                    if old_path.exists():
+                        old_path.unlink()
+                except Exception:
+                    pass
+                db.delete(existing_attachment)
+            else:
+                # Prepare AuditLog for new upload
+                _audit(
+                    db,
+                    current_user,
+                    id,
+                    "announcement_file_uploaded",
+                    new_value={
+                        "actor_id": str(current_user.id),
+                        "announcement_id": str(id),
+                        "filename": sanitized_filename,
+                        "storage_key": storage_key,
+                        "timestamp": datetime.utcnow().isoformat()
+                    },
+                    changed_fields={"file_uploaded": True}
+                )
+
+            doc = DocumentAttachment(
+                filename=sanitized_filename,
+                storage_key=storage_key,
+                file_size=file_size,
+                mime_type=file.content_type or "application/octet-stream",
+                uploaded_by=current_user.id,
+                entity_type="announcement",
+                entity_id=id
+            )
+            db.add(doc)
     except Exception as e:
-        db.rollback()
         # Clean up new file on failure
         if file_path.exists():
             try:
@@ -250,50 +243,49 @@ def delete_announcement(
         raise HTTPException(status_code=404, detail="Announcement not found.")
 
     old = _snapshot(announcement)
-    announcement.is_deleted = True
-    announcement.deleted_at = datetime.utcnow()
-    announcement.deleted_by = current_user.id
-    db.add(announcement)
-    db.flush()
 
-    from backend.app.core.file_security import verify_path_traversal
+    from backend.app.services.transaction_service import transactional
 
-    # Audit log
-    attachment = db.query(DocumentAttachment).filter(
-        DocumentAttachment.entity_type == "announcement",
-        DocumentAttachment.entity_id == announcement_id
-    ).first()
-    if attachment:
-        _audit(
-            db,
-            current_user,
-            announcement_id,
-            "announcement_file_removed",
-            old_value={
-                "actor_id": str(current_user.id),
-                "announcement_id": str(announcement_id),
-                "filename": attachment.filename,
-                "storage_key": attachment.storage_key,
-                "timestamp": datetime.utcnow().isoformat()
-            },
-            changed_fields={"file_removed": True}
-        )
-        # Remove file on disk safely
-        try:
-            attachment_path = UPLOAD_DIR / attachment.storage_key
-            verify_path_traversal(attachment_path, UPLOAD_DIR)
-            if attachment_path.exists():
-                attachment_path.unlink()
-        except Exception:
-            pass
-        # delete attachment record
-        try:
+    with transactional(db):
+        announcement.is_deleted = True
+        announcement.deleted_at = datetime.utcnow()
+        announcement.deleted_by = current_user.id
+        db.add(announcement)
+        db.flush()
+
+        from backend.app.core.file_security import verify_path_traversal
+
+        # Audit log
+        attachment = db.query(DocumentAttachment).filter(
+            DocumentAttachment.entity_type == "announcement",
+            DocumentAttachment.entity_id == announcement_id
+        ).first()
+        if attachment:
+            _audit(
+                db,
+                current_user,
+                announcement_id,
+                "announcement_file_removed",
+                old_value={
+                    "actor_id": str(current_user.id),
+                    "announcement_id": str(announcement_id),
+                    "filename": attachment.filename,
+                    "storage_key": attachment.storage_key,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                changed_fields={"file_removed": True}
+            )
+            # Remove file on disk safely
+            try:
+                attachment_path = UPLOAD_DIR / attachment.storage_key
+                verify_path_traversal(attachment_path, UPLOAD_DIR)
+                if attachment_path.exists():
+                    attachment_path.unlink()
+            except Exception:
+                pass
+            # delete attachment record
             db.delete(attachment)
-            db.flush()
-        except Exception:
-            pass
 
-    try:
         _audit(
             db,
             current_user,
@@ -302,9 +294,5 @@ def delete_announcement(
             old_value=old,
             changed_fields={"deleted": True}
         )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
         
     return {"status": "success", "message": "Announcement soft-deleted successfully."}

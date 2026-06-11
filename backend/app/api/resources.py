@@ -2,7 +2,7 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from pydantic import BaseModel, Field, field_validator
 
@@ -18,7 +18,8 @@ from backend.app.models.database import (
     Role,
     ResourceStatus,
     TaskScheduleEntry,
-    AuditLog
+    Country,
+    City
 )
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user, hash_password
@@ -26,6 +27,9 @@ from backend.app.api.admin_users import _generate_password
 from backend.app.services.progress_service import ProgressService
 
 router = APIRouter(prefix="/resources", tags=["Resources"])
+
+from backend.app.services.audit_service import AuditService
+
 
 def _audit(
     db: Session,
@@ -37,26 +41,17 @@ def _audit(
     new_value: Optional[dict] = None,
     changed_fields: Optional[dict] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="user_management",
-                action=action,
-                table_name=table_name,
-                record_id=record_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor_id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor_id,
+        module="user_management",
+        action=action,
+        table_name=table_name,
+        record_id=record_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 
 class ResourceCreateRequest(BaseModel):
@@ -83,6 +78,11 @@ class ResourceUpdateRequest(BaseModel):
     status: Optional[str] = None
     weekly_allowed_hours: Optional[int] = None
     performance_notes: Optional[str] = None
+    current_address: Optional[str] = None
+    city_id: Optional[UUID] = None
+    citizen_of_id: Optional[UUID] = None
+    avatar_url: Optional[str] = None
+    nationality: Optional[str] = None
 
 
 class SelfProfileUpdateRequest(BaseModel):
@@ -106,26 +106,122 @@ class SelfProfileUpdateRequest(BaseModel):
     emergency_contact_phone: Optional[str] = None
     emergency_contact_email: Optional[str] = None
     emergency_contact_address: Optional[str] = None
-    # Bank details sub-object
     bank_name: Optional[str] = None
     account_number: Optional[str] = None
     sort_code: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+def _serialize_resource(resource: Resource) -> dict:
+    if not resource:
+        return {}
+    
+    # Get address string
+    addr_str = ""
+    citizen_of_str = resource.nationality or ""
+    if resource.address:
+        addr_str = resource.address.current_address or ""
+        if resource.address.country and not citizen_of_str:
+            citizen_of_str = resource.address.country.name or ""
+
+    # Emergency contact details
+    ec_name = ""
+    ec_phone = ""
+    ec_email = ""
+    ec_address = ""
+    if resource.emergency_contact:
+        ec_name = resource.emergency_contact.contact_name or ""
+        ec_phone = resource.emergency_contact.phone or ""
+        ec_email = resource.emergency_contact.email or ""
+        ec_address = resource.emergency_contact.address or ""
+
+    # Bank details
+    b_name = ""
+    b_acc = ""
+    b_sort = ""
+    if resource.bank_details:
+        b_name = resource.bank_details.bank_name or ""
+        b_acc = resource.bank_details.account_number or ""
+        b_sort = resource.bank_details.sort_code or ""
+
+    # Status name
+    status_name = "active"
+    if resource.status:
+        status_name = resource.status.name
+
+    # Designation title
+    desig_title = "Developer"
+    if resource.designation:
+        desig_title = resource.designation.title
+
+    return {
+        "id": str(resource.id),
+        "employee_id": resource.employee_id,
+        "full_name": resource.full_name,
+        "email": resource.email,
+        "phone": resource.phone,
+        "dob": resource.dob.isoformat() if resource.dob else None,
+        "ni_number": resource.ni_number,
+        "status": status_name,
+        "avatar_url": resource.avatar_url,
+        "weekly_allowed_hours": resource.weekly_allowed_hours,
+        "performance_notes": resource.performance_notes,
+        "other_info": resource.other_info,
+        "skillset": resource.skillset,
+        "profile_completion_percentage": resource.profile_completion_percentage,
+        "onboarding_status": resource.onboarding_status,
+        "approval_status": resource.approval_status,
+        "user_is_active": any(u.is_active for u in resource.user) if isinstance(resource.user, list) else (resource.user.is_active if resource.user else False),
+        "is_deleted": resource.is_deleted,
+        "has_required_documents": resource.has_required_documents,
+        "passport_number": resource.passport_number,
+        "passport_expiry": resource.passport_expiry.isoformat() if resource.passport_expiry else None,
+        "visa_number": resource.visa_number,
+        "visa_expiry": resource.visa_expiry.isoformat() if resource.visa_expiry else None,
+        "nationality": resource.nationality,
+        "department_id": str(resource.department_id) if resource.department_id else None,
+        "designation_id": str(resource.designation_id) if resource.designation_id else None,
+        "designation_title": desig_title,
+        
+        # Flat relationships
+        "address": addr_str,
+        "citizen_of": citizen_of_str,
+        "account_number": b_acc,
+        "sort_code": b_sort,
+        "bank_name": b_name,
+        "emergency_contact_name": ec_name,
+        "emergency_contact_phone": ec_phone,
+        "emergency_contact_email": ec_email,
+        "emergency_contact_address": ec_address,
+    }
 
 
 @router.get("/")
 def get_resources_grid(status: Optional[str] = None, db: Session = Depends(get_db_session), current_user: User = Depends(require_current_user)):
-    query = db.query(Resource).filter(Resource.is_deleted == False)
+    query = db.query(Resource).options(
+        joinedload(Resource.address).joinedload(ResourceAddress.country),
+        joinedload(Resource.bank_details),
+        joinedload(Resource.emergency_contact),
+        joinedload(Resource.designation),
+        joinedload(Resource.status),
+        joinedload(Resource.user)
+    ).filter(Resource.is_deleted == False)
     if status:
         query = query.filter(Resource.status == status)
-    return query.all()
+    return [_serialize_resource(r) for r in query.all()]
 
 
 @router.get("/pending")
 def get_pending_resources(db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
-    return db.query(Resource).filter(Resource.status == "pending", Resource.is_deleted == False).all()
-
-
-
+    resources = db.query(Resource).options(
+        joinedload(Resource.address).joinedload(ResourceAddress.country),
+        joinedload(Resource.bank_details),
+        joinedload(Resource.emergency_contact),
+        joinedload(Resource.designation),
+        joinedload(Resource.status),
+        joinedload(Resource.user)
+    ).filter(Resource.status == "pending", Resource.is_deleted == False).all()
+    return [_serialize_resource(r) for r in resources]
 
 
 @router.get("/{resource_id}")
@@ -133,7 +229,14 @@ def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session
     if current_user.role.name not in ["super_admin", "admin"] and resource_id != current_user.resource_id:
         raise HTTPException(status_code=403, detail="Access denied.")
 
-    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
+    resource = db.query(Resource).options(
+        joinedload(Resource.address).joinedload(ResourceAddress.country),
+        joinedload(Resource.bank_details),
+        joinedload(Resource.emergency_contact),
+        joinedload(Resource.designation),
+        joinedload(Resource.status),
+        joinedload(Resource.user)
+    ).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource profile not found.")
 
@@ -156,7 +259,7 @@ def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session
 
     # Build enriched response
     return {
-        "resource": resource,
+        "resource": _serialize_resource(resource),
         "profile_completion_percentage": completion_data["completion_percentage"],
         "onboarding_status": completion_data["onboarding_status"],
         "missing_fields": completion_data["missing_fields"],
@@ -165,27 +268,53 @@ def get_resource_details(resource_id: UUID, db: Session = Depends(get_db_session
     }
 
 
-@router.put("/{resource_id}/approve")
-def approve_pending_resource(resource_id: UUID, db: Session = Depends(get_db_session), current_user: User = Depends(require_privileged_user)):
-    resource = db.query(Resource).filter(Resource.id == resource_id, Resource.is_deleted == False).first()
-    if not resource:
-        raise HTTPException(status_code=404, detail="Resource profile not found.")
+
+
+
+def _generate_resource_username(db: Session, full_name: str) -> str:
+    # Split full name by space and sanitize alphanumeric parts
+    parts = [p.strip().lower() for p in full_name.split() if p.strip()]
+    parts = ["".join(c for c in p if c.isalnum()) for p in parts]
+    parts = [p for p in parts if p]
     
-    resource.status = "active"
-    db.add(resource)
-    db.commit()
-    return {"id": resource.id, "status": "active", "message": "Resource onboarded successfully."}
-
-
-def _generate_resource_username(db: Session) -> str:
-    users = db.query(User.username).filter(User.username.like("res_%")).all()
+    if len(parts) >= 2:
+        firstname = parts[0]
+        lastname = parts[-1]
+    elif len(parts) == 1:
+        firstname = parts[0]
+        lastname = "employee"
+    else:
+        firstname = "resource"
+        lastname = "user"
+        
+    base_pattern = f"{firstname}.{lastname}"
+    
+    # Query existing usernames that start with base_pattern + '.'
+    users = db.query(User.username).filter(User.username.like(f"{base_pattern}.%")).all()
     numbers = []
     for (uname,) in users:
-        parts = uname.split("_")
-        if len(parts) == 2 and parts[1].isdigit():
-            numbers.append(int(parts[1]))
+        u_parts = uname.split(".")
+        if len(u_parts) >= 3 and u_parts[-1].isdigit():
+            numbers.append(int(u_parts[-1]))
+            
     next_num = max(numbers) + 1 if numbers else 1
-    return f"res_{next_num:05d}"
+    return f"{base_pattern}.{next_num}"
+
+
+def _generate_employee_id(db: Session) -> str:
+    resources = db.query(Resource.employee_id).filter(Resource.employee_id.like("EMP-%")).all()
+    existing_ids = set()
+    for (emp_id,) in resources:
+        if emp_id:
+            parts = emp_id.split("-")
+            if len(parts) == 2 and parts[1].isdigit():
+                existing_ids.add(int(parts[1]))
+                
+    next_num = 1
+    while next_num in existing_ids:
+        next_num += 1
+        
+    return f"EMP-{next_num:04d}"
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -203,20 +332,17 @@ def create_resource(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
 
         # 1. Generate unique sequential username
-        username_gen = _generate_resource_username(db)
+        username_gen = _generate_resource_username(db, request.full_name)
         
-        # 2. Get active resource status
-        active_status = db.query(ResourceStatus).filter(ResourceStatus.name == "active").first()
-        if not active_status:
-            active_status = ResourceStatus(name="active")
-            db.add(active_status)
+        # 2. Get pending resource status
+        pending_status = db.query(ResourceStatus).filter(ResourceStatus.name == "pending").first()
+        if not pending_status:
+            pending_status = ResourceStatus(name="pending")
+            db.add(pending_status)
             db.flush()
         
-        # 3. Generate unique employee_id (e.g. EMP-XXXXX)
-        import random
-        employee_id = f"EMP-{random.randint(10000, 99999)}"
-        while db.query(Resource).filter(Resource.employee_id == employee_id).first():
-            employee_id = f"EMP-{random.randint(10000, 99999)}"
+        # 3. Generate unique sequential employee_id (e.g. EMP-00001)
+        employee_id = _generate_employee_id(db)
         
         # 4. Create Resource profile
         resource = Resource(
@@ -225,8 +351,10 @@ def create_resource(
             designation_id=request.designation_id,
             department_id=request.department_id,
             email=email,
-            status_id=active_status.id,
+            status_id=pending_status.id,
             skillset=request.skills,
+            onboarding_status="pending",
+            approval_status="pending",
             is_deleted=False
         )
         db.add(resource)
@@ -283,7 +411,7 @@ def create_resource(
                 "full_name": resource.full_name,
                 "email": resource.email,
                 "skillset": resource.skillset,
-                "status": "active"
+                "status": "pending"
             },
             "credentials": {
                 "username": user.username,
@@ -486,11 +614,62 @@ def update_resource(
         resource.weekly_allowed_hours = request.weekly_allowed_hours
     if request.performance_notes is not None:
         resource.performance_notes = request.performance_notes
+    if request.avatar_url is not None:
+        from backend.app.core.file_security import check_base64_file_size
+        check_base64_file_size(request.avatar_url)
+        resource.avatar_url = request.avatar_url
+    if request.nationality is not None:
+        resource.nationality = request.nationality
         
     if request.status is not None:
         res_status = db.query(ResourceStatus).filter(ResourceStatus.name == request.status).first()
         if res_status:
             resource.status_id = res_status.id
+
+    # ─── Address upsert (Admin update) ───
+    if any([request.current_address is not None, request.city_id is not None, request.citizen_of_id is not None]):
+        addr = db.query(ResourceAddress).filter(ResourceAddress.resource_id == resource.id).first()
+        if addr:
+            if request.current_address is not None:
+                new_norm = " ".join(request.current_address.strip().split()).lower()
+                old_norm = " ".join((addr.current_address or "").strip().split()).lower()
+                
+                # Check if this is a real change and NOT a first-time entry
+                if old_norm and new_norm != old_norm:
+                    addr.previous_address = addr.current_address
+                    addr.last_changed_at = datetime.utcnow()
+                    addr.last_changed_by = current_user.id
+                
+                addr.current_address = request.current_address
+            if request.city_id is not None:
+                addr.city_id = request.city_id
+            if request.citizen_of_id is not None:
+                addr.citizen_of_id = request.citizen_of_id
+            db.add(addr)
+        else:
+            # Fall back to default city and country if not provided
+            city_id = request.city_id
+            citizen_of_id = request.citizen_of_id
+            if not city_id:
+                city = db.query(City).first()
+                if city:
+                    city_id = city.id
+            if not citizen_of_id:
+                country = db.query(Country).first()
+                if country:
+                    citizen_of_id = country.id
+            
+            if city_id and citizen_of_id:
+                addr = ResourceAddress(
+                    resource_id=resource.id,
+                    current_address=request.current_address or "",
+                    city_id=city_id,
+                    citizen_of_id=citizen_of_id,
+                    previous_address=None,
+                    last_changed_at=None,
+                    last_changed_by=None
+                )
+                db.add(addr)
             
     resource.updated_at = datetime.utcnow()
     db.add(resource)
@@ -512,7 +691,7 @@ def update_resource(
     )
     db.commit()
     db.refresh(resource)
-    return resource
+    return _serialize_resource(resource)
 
 
 # ==============================================================================
@@ -539,9 +718,26 @@ def update_self_profile(
     if not resource:
         raise HTTPException(status_code=404, detail="Resource profile not found.")
 
+    # Validate unique NI number if provided
+    if request.ni_number is not None and request.ni_number.strip():
+        ni_clean = request.ni_number.strip()
+        existing = db.query(Resource).filter(
+            Resource.ni_number == ni_clean,
+            Resource.id != resource.id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="National Insurance (NI) number already exists on another profile."
+            )
+
     # ─── Direct resource fields ───
+    if request.avatar_url is not None:
+        from backend.app.core.file_security import check_base64_file_size
+        check_base64_file_size(request.avatar_url)
+
     date_fields_map = {"dob": "dob", "passport_expiry": "passport_expiry", "visa_expiry": "visa_expiry"}
-    simple_fields = ["phone", "ni_number", "nationality", "passport_number", "visa_number", "skillset", "other_info"]
+    simple_fields = ["phone", "ni_number", "nationality", "passport_number", "visa_number", "skillset", "other_info", "avatar_url"]
 
     for f in simple_fields:
         val = getattr(request, f, None)
@@ -562,10 +758,19 @@ def update_self_profile(
     db.flush()
 
     # ─── Address upsert ───
-    if any([request.current_address, request.city_id, request.citizen_of_id]):
+    if any([request.current_address is not None, request.city_id is not None, request.citizen_of_id is not None]):
         addr = db.query(ResourceAddress).filter(ResourceAddress.resource_id == resource.id).first()
         if addr:
             if request.current_address is not None:
+                new_norm = " ".join(request.current_address.strip().split()).lower()
+                old_norm = " ".join((addr.current_address or "").strip().split()).lower()
+                
+                # Check if this is a real change and NOT a first-time entry
+                if old_norm and new_norm != old_norm:
+                    addr.previous_address = addr.current_address
+                    addr.last_changed_at = datetime.utcnow()
+                    addr.last_changed_by = current_user.id
+                
                 addr.current_address = request.current_address
             if request.city_id is not None:
                 addr.city_id = request.city_id
@@ -573,13 +778,27 @@ def update_self_profile(
                 addr.citizen_of_id = request.citizen_of_id
             db.add(addr)
         else:
-            # Need city_id and citizen_of_id for new record
-            if request.city_id and request.citizen_of_id:
+            # Fall back to default city and country if not provided
+            city_id = request.city_id
+            citizen_of_id = request.citizen_of_id
+            if not city_id:
+                city = db.query(City).first()
+                if city:
+                    city_id = city.id
+            if not citizen_of_id:
+                country = db.query(Country).first()
+                if country:
+                    citizen_of_id = country.id
+            
+            if city_id and citizen_of_id:
                 addr = ResourceAddress(
                     resource_id=resource.id,
                     current_address=request.current_address or "",
-                    city_id=request.city_id,
-                    citizen_of_id=request.citizen_of_id,
+                    city_id=city_id,
+                    citizen_of_id=citizen_of_id,
+                    previous_address=None,
+                    last_changed_at=None,
+                    last_changed_by=None
                 )
                 db.add(addr)
         db.flush()
@@ -688,17 +907,50 @@ def approve_resource_onboarding(
     if not resource:
         raise HTTPException(status_code=404, detail="Resource profile not found.")
 
-    resource.approval_status = "approved"
-    resource.updated_at = datetime.utcnow()
-    db.add(resource)
+    # Step 1: Enforce onboarding completed state
+    if resource.onboarding_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Required onboarding requirements are incomplete."
+        )
 
-    _audit(
-        db,
-        current_user.id,
-        resource.id,
-        "resource_approval_granted",
-        "resources",
-        new_value={"approval_status": "approved"}
-    )
-    db.commit()
+    # Step 2: Enforce profile completion >= 80%
+    if (resource.profile_completion_percentage or 0) < 80:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Required onboarding requirements are incomplete."
+        )
+
+    # Step 3: Enforce mandatory documents uploaded
+    if not resource.has_required_documents:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Required onboarding requirements are incomplete."
+        )
+
+    from backend.app.services.transaction_service import transactional
+
+    with transactional(db):
+        # 3. Query the active status lookup record
+        active_status = db.query(ResourceStatus).filter(ResourceStatus.name == "active").first()
+        if not active_status:
+            active_status = ResourceStatus(name="active")
+            db.add(active_status)
+            db.flush()
+
+        # 4. Update status and approval
+        resource.status_id = active_status.id
+        resource.approval_status = "approved"
+        resource.updated_at = datetime.utcnow()
+        db.add(resource)
+
+        _audit(
+            db,
+            current_user.id,
+            resource.id,
+            "resource_approval_granted",
+            "resources",
+            new_value={"approval_status": "approved", "status": "active"}
+        )
+
     return {"status": "success", "resource_id": str(resource.id), "approval_status": "approved"}

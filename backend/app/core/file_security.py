@@ -1,9 +1,24 @@
 import os
 import re
+import base64
 from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp"
+}
+
+ALLOWED_DOCUMENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png"
+}
+
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg", ".xlsx", ".xls"}
 BLOCKED_EXTENSIONS = {".exe", ".js", ".sh", ".bat", ".ps1", ".dll"}
 
@@ -79,3 +94,44 @@ def verify_path_traversal(target_path: Path, root_dir: Path):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error validating file path: {str(e)}"
         )
+
+def check_base64_file_size(base64_str: str):
+    if not base64_str:
+        return
+
+    try:
+        payload = base64_str.split(",", 1)[1] if "," in base64_str else base64_str
+        decoded = base64.b64decode(payload)
+
+        if len(decoded) > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail="Profile picture size cannot exceed 10MB."
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image upload."
+        )
+
+async def validate_upload_file(
+    file: UploadFile,
+    allowed_types: set[str]
+):
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type."
+        )
+
+    contents = await file.read()
+
+    if len(contents) > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File size cannot exceed 10MB."
+        )
+
+    await file.seek(0)

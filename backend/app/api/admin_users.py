@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import hash_password, require_super_admin
-from backend.app.models.database import AuditLog, Role, User
+from backend.app.models.database import Role, User, AuditLog
 from backend.app.schemas.admin_users import (
     AdminCreateRequest,
     AdminResponse,
@@ -126,6 +126,9 @@ def _generate_admin_username(db: Session, full_name: str) -> str:
         counter += 1
 
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -135,25 +138,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    savepoint = db.begin_nested()
-    try:
-        db.add(
-            AuditLog(
-                module="user_management",
-                action=action,
-                table_name="users",
-                record_id=target.id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        savepoint.rollback()
-        import logging
-        logging.getLogger(__name__).exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="admin_users",
+        action=action,
+        table_name="users",
+        record_id=target.id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 
 @router.get("/users", response_model=List[AdminResponse])
@@ -384,7 +379,7 @@ def list_admin_audit_logs(
     db: Session = Depends(get_db_session),
     current_user: User = Depends(require_super_admin),
 ):
-    logs = db.query(AuditLog).filter(AuditLog.module == "admin_users").order_by(AuditLog.created_at.desc()).limit(100).all()
+    logs = db.query(AuditLog).filter(AuditLog.module.in_(["admin_users", "user_management"])).order_by(AuditLog.created_at.desc()).limit(100).all()
     actor_ids = {log.user_id for log in logs if log.user_id}
     actors = {
         user.id: user.username

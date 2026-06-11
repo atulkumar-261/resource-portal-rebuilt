@@ -109,3 +109,16 @@ class ProductivityResponse(BaseModel):
     current_progress: float
     reporting_streak: int = 0
     efficiency_metrics: Optional[dict] = None
+
+
+class AddressChangeResponse(BaseModel):
+    id: UUID
+    resource_id: UUID
+    resource_name: str
+    current_address: str
+    old_address: Optional[str] = None
+    changed_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

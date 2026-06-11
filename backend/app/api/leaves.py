@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_db_session
 from backend.app.core.security import require_privileged_user, require_current_user
-from backend.app.models.database import Leave, LeaveBalance, LeaveType, Approval, User, Resource, AuditLog
+from backend.app.models.database import Leave, LeaveBalance, LeaveType, Approval, User, Resource
 from backend.app.schemas.leaves import LeaveApplyRequest, LeaveResponse
+from backend.app.services.resource_eligibility import validate_resource_assignable
 
 router = APIRouter(prefix="/leaves", tags=["Leaves"])
 
@@ -34,6 +35,9 @@ def _snapshot(leave: Leave) -> Dict[str, Any]:
         "status": leave.status,
     }
 
+from backend.app.services.audit_service import AuditService
+
+
 def _audit(
     db: Session,
     actor: User,
@@ -43,26 +47,17 @@ def _audit(
     new_value: Optional[Dict[str, Any]] = None,
     changed_fields: Optional[Dict[str, Any]] = None,
 ):
-    try:
-        db.begin_nested()
-        db.add(
-            AuditLog(
-                module="leaves",
-                action=action,
-                table_name="leaves",
-                record_id=leave_id,
-                old_value=old_value,
-                new_value=new_value,
-                changed_fields=changed_fields,
-                user_id=actor.id,
-            )
-        )
-        db.flush()
-    except Exception:
-        db.rollback()
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.exception("Audit log failure")
+    AuditService.record(
+        db=db,
+        actor_id=actor.id,
+        module="leaves",
+        action=action,
+        table_name="leaves",
+        record_id=leave_id,
+        old_value=old_value,
+        new_value=new_value,
+        changed_fields=changed_fields
+    )
 
 def _leave_response(db: Session, leave: Leave) -> LeaveResponse:
     # Resolve resource name
@@ -110,6 +105,18 @@ def apply_leave(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only resource accounts are authorized to apply for leaves."
+        )
+
+    # Re-verify resource exists, isn't deleted, and is active & approved
+    res = db.query(Resource).filter(Resource.id == current_user.resource_id, Resource.is_deleted == False).first()
+    if not res:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource profile not found.")
+    try:
+        validate_resource_assignable(res)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only active, approved, and fully onboarded resources can apply for leaves."
         )
 
     from_date_obj = parse_date(request.from_date)

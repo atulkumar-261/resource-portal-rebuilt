@@ -3,6 +3,9 @@ import { PageCard } from "@/components/layout/AppShell";
 import { useRMS } from "@/lib/store";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Trash2, User, ArrowLeft, CheckCircle } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { approveResourceOnboarding } from "@/lib/api/resources";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/resources/pending")({
   component: AdminresourcespendingPage,
@@ -15,8 +18,25 @@ function AdminresourcespendingPage() {
   const del = useRMS((s) => s.deleteResource);
   const router = useRouter();
 
+  const queryClient = useQueryClient();
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => approveResourceOnboarding(id),
+    onSuccess: (_, id) => {
+      toast.success("Resource approved!");
+      updateResource(id, {
+        status: "active",
+        approvalStatus: "approved",
+        onboardingStatus: "completed"
+      });
+      queryClient.invalidateQueries({ queryKey: ["resources-dashboard"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to approve onboarding.");
+    }
+  });
+
   const handleApprove = (id: string) => {
-    updateResource(id, { status: "active" });
+    approveMutation.mutate(id);
   };
 
   return (

@@ -1,6 +1,8 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { useRMS } from "@/lib/store";
+import { isResourceAssignable } from "@/lib/types";
+import { validateFileSize } from "@/lib/utils/uploadValidation";
 
 export const Route = createFileRoute("/admin/payslips/new")({
   component: AdminpayslipsnewPage,
@@ -9,6 +11,7 @@ export const Route = createFileRoute("/admin/payslips/new")({
 function AdminpayslipsnewPage() {
   const add = useRMS((s) => s.addPayslip);
   const resources = useRMS((s) => s.resources);
+  const activeResources = resources.filter(isResourceAssignable);
   const router = useRouter();
 
   // Form states
@@ -98,6 +101,14 @@ function AdminpayslipsnewPage() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
+                if (file) {
+                  if (!validateFileSize(file)) {
+                    setSelectedFile(null);
+                    setFileName("No file chosen");
+                    e.target.value = "";
+                    return;
+                  }
+                }
                 setFileName(file ? file.name : "No file chosen");
                 setSelectedFile(file || null);
               }}
@@ -116,7 +127,7 @@ function AdminpayslipsnewPage() {
             required
           >
             <option value="">Select Resource</option>
-            {resources.map((r) => (
+             {activeResources.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.fullName}
               </option>
